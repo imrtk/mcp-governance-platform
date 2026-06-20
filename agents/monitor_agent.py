@@ -2,8 +2,9 @@ import os, json, threading, time, datetime, httpx
 from agents.base_agent import BaseAgent
 
 DEBIAN_MCP_URL = os.getenv("DEBIAN_MCP_URL", "http://localhost:8003")
+DO_MCP_URL = os.getenv("DO_MCP_URL", "http://localhost:8005/mcp")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3-coder:480b-cloud")
 
 
 def _llm_analyze(host: str, svc: str, logs: str) -> str:
@@ -31,6 +32,50 @@ Example: NO - configuration error detected in logs"""
     except Exception as e:
         print(f"[monitor-agent] LLM error: {e}")
         return "LLM_ERROR"
+
+
+def _call_do(tool: str, params: dict) -> str:
+    payload = {"jsonrpc": "2.0", "method": "tools/call", "params": {"name": tool, "arguments": params}, "id": 1}
+    try:
+        resp = httpx.post(DO_MCP_URL, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        contents = data.get("result", {}).get("content", [])
+        return "\n".join(c.get("text", "") for c in contents)
+    except Exception as e:
+        return f"[ERROR] {e}"
+
+
+def _check_droplets() -> list[dict]:
+    results = []
+    raw = _call_do("list_droplets", {})
+    for line in raw.strip().split("\n"):
+        if line.startswith("Droplets:") or line.startswith("No managed"):
+            continue
+        parts = line.strip().split()
+        if len(parts) >= 2:
+            dname = parts[0]
+            status = parts[1]
+            result = {"name": dname, "status": status, "ip": parts[-1] if len(parts) > 2 else "-"}
+            if status == "off":
+                print(f"[monitor-agent] DO off: {dname}, orchestrator'a bildiriliyor...")
+                fix_result = _call_orchestrator(f"{dname} dropleti kapali, ensure_running ile ac. do-agent kullan")
+                result["auto_fix"] = fix_result
+                result["fixed"] = True
+                ts = datetime.datetime.now().strftime("%H:%M:%S")
+                with _alert_lock:
+                    _alert_history.append({
+                        "time": ts,
+                        "host": f"do:{dname}",
+                        "service": "droplet",
+                        "action": "orchestrator",
+                        "result": fix_result[:120],
+                    })
+                print(f"[monitor-agent] ORCHESTRATOR {dname}: {fix_result[:60]}")
+            else:
+                result["fixed"] = False
+            results.append(result)
+    return results
 
 
 def _call_mcp(tool: str, params: dict) -> str:
@@ -214,38 +259,36 @@ def _check_host_internal(host: str) -> dict:
     return result
 
 
+def _call_orchestrator(task: str) -> str:
+    try:
+        resp = httpx.post(
+            f"{GATEWAY_URL}/api/gateway/agent/orchestrator-agent/ask",
+            json={"tool_name": "ask", "params": {"task": task}},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        contents = data.get("result", {}).get("content", [])
+        return "\n".join(c.get("text", "") for c in contents)
+    except Exception as e:
+        return f"[ORCHESTRATOR ERROR] {e}"
+
+
 def _auto_fix(host: str, svc: str) -> str | None:
     if not AUTO_FIX:
         return None
-    logs = ""
-    try:
-        logs = _call("journalctl", {"host_name": host, "service": svc, "lines": 30})
-    except Exception:
-        pass
-    if logs:
-        llm_decision = _llm_analyze(host, svc, logs)
-        print(f"[monitor-agent] LLM karari {host}/{svc}: {llm_decision}")
-        dec = llm_decision.strip().upper()
-        if dec.startswith("NO"):
-            result = f"LLM REDDETTI: {llm_decision}"
-            with _alert_lock:
-                _alert_history.append({
-                    "time": datetime.datetime.now().strftime("%H:%M:%S"),
-                    "host": host, "service": svc, "action": "llm_skip", "result": result,
-                })
-            print(f"[monitor-agent] {result}")
-            return result
-    result = _restart_service(host, svc)
     fix_time = datetime.datetime.now().strftime("%H:%M:%S")
+    task = f"{host} sunucusunda {svc} servisi down, kontrol et ve duzelt. sysadmin-agent kullan"
+    result = _call_orchestrator(task)
     with _alert_lock:
         _alert_history.append({
             "time": fix_time,
             "host": host,
             "service": svc,
-            "action": "restart",
-            "result": result,
+            "action": "orchestrator",
+            "result": result[:120],
         })
-    print(f"[monitor-agent] AUTO-FIX {host}/{svc}: {result[:60]}")
+    print(f"[monitor-agent] ORCHESTRATOR {host}/{svc}: {result[:80]}")
     return result
 
 
@@ -265,25 +308,25 @@ def _run_monitor_cycle():
                     if alert.startswith("DOWN:"):
                         svc = alert.replace("DOWN:", "").strip()
                         fix_result = _auto_fix(host, svc)
-                        if fix_result:
-                            if "OK" in fix_result:
-                                res["alerts"] = [a for a in res["alerts"] if a != alert]
-                                if not res["alerts"]:
-                                    res["status"] = "ok"
                 results.append(res)
             except Exception as e:
                 results.append({"host": host, "status": "error", "alerts": [str(e)], "timestamp": time.time()})
+
+        droplets = _check_droplets()
+        with _status_lock:
+            _status_cache["droplets"] = droplets
+
         with _status_lock:
             _status_cache["last_run"] = time.time()
             _status_cache["results"] = results
-            _status_cache["summary"] = _format_summary(results)
+            _status_cache["summary"] = _format_summary(results, droplets)
         return results
     finally:
         _cycle_running = False
         _cycle_lock.release()
 
 
-def _format_summary(results: list) -> str:
+def _format_summary(results: list, droplets: list = None) -> str:
     total = len(results)
     ok = sum(1 for r in results if r["status"] == "ok")
     warn = sum(1 for r in results if r["status"] == "warn")
@@ -298,6 +341,11 @@ def _format_summary(results: list) -> str:
                 lines.append(f"  ! {a}")
         else:
             lines.append(f"\n{r['host']}: saglikli")
+    if droplets:
+        lines.append(f"\n--- DO Droplets ({len(droplets)}) ---")
+        for d in droplets:
+            icon = "✓" if not d.get("fixed") else "🔧"
+            lines.append(f"  {icon} {d['name']}: {d['status']}")
     return "\n".join(lines)
 
 
@@ -341,6 +389,15 @@ def _check_all(args: dict) -> str:
                 out.append(f"  MEM: %{r['memory_pct']}")
             if "disk_pct" in r:
                 out.append(f"  DISK: %{r['disk_pct']}")
+    with _status_lock:
+        droplets = _status_cache.get("droplets", [])
+        if droplets:
+            out.append(f"\n--- DO Droplets ({len(droplets)}) ---")
+            for d in droplets:
+                icon = "✓" if not d.get("fixed") else "🔧"
+                out.append(f"  {icon} {d['name']}: {d['status']}")
+                if d.get("fixed"):
+                    out.append(f"      Auto-fix: {d.get('auto_fix', '')[:80]}")
     with _alert_lock:
         if _alert_history:
             out.append(f"\nSon mudahaleler ({len(_alert_history)}):")
@@ -375,6 +432,12 @@ def _check_host(args: dict) -> str:
 def _status_report(args: dict) -> str:
     with _status_lock:
         summary = _status_cache.get("summary", "Henuz monitor calismadi.")
+        droplets = _status_cache.get("droplets", [])
+        if droplets:
+            summary += f"\n\n--- DO Droplets ({len(droplets)}) ---"
+            for d in droplets:
+                icon = "✓" if not d.get("fixed") else "🔧"
+                summary += f"\n  {icon} {d['name']}: {d['status']}"
     with _alert_lock:
         if _alert_history:
             summary += f"\n\nSON MUDAHALELER ({len(_alert_history)}):"

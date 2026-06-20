@@ -109,6 +109,8 @@
 
         <div class="host-status-bar" id="host-status-bar" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
 
+        <div class="host-status-bar" id="droplet-status-bar" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
+
         <div class="tab-bar">
             <div class="tab active" onclick="switchTab('rules')">Policy Rules</div>
             <div class="tab" onclick="switchTab('yaml')">YAML Editor</div>
@@ -116,6 +118,7 @@
             <div class="tab" onclick="switchTab('agents')">Agent'lar</div>
             <div class="tab" onclick="switchTab('test')">Test</div>
             <div class="tab" onclick="switchTab('audit')">Audit Log</div>
+            <div class="tab" onclick="switchTab('orch')">Orchestrator</div>
             <div class="tab" onclick="switchTab('chat')">Agent Konuşmaları</div>
             <div class="tab" onclick="switchTab('logstream')">Log Akışı</div>
         </div>
@@ -196,6 +199,18 @@
                     <button class="btn-save" onclick="loadChat()">Yenile</button>
                 </div>
                 <div style="max-height:600px;overflow-y:auto" id="chat-box">
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-orch" class="tab-content">
+            <div class="card full" style="margin-bottom:16px">
+                <div class="inline-flex" style="justify-content:space-between;margin-bottom:12px">
+                    <h2 style="border:none;margin:0;padding:0">Orchestrator Execution History</h2>
+                    <button class="btn-save" onclick="loadOrchHistory()">Yenile</button>
+                </div>
+                <div style="max-height:700px;overflow-y:auto" id="orch-history-box">
+                    <p style="text-align:center;color:var(--text-secondary);padding:20px">Henuz calistirilmadi</p>
                 </div>
             </div>
         </div>
@@ -431,6 +446,53 @@
             try { const r = await fetch(`/api/gateway/agent/${name}/ask`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tool_name:tool,params:{}})}); const d = await r.json(); alert(JSON.stringify(d, null, 2)); } catch(e) { alert('Hata: '+e.message); }
         }
 
+        async function loadOrchHistory() {
+            try {
+                const data = await api('/api/gateway/orchestrator/history?limit=20');
+                const box = document.getElementById('orch-history-box');
+                if (!data || !data.length) {
+                    box.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px">Henuz calistirilmadi</p>';
+                    return;
+                }
+                box.innerHTML = data.map(e => {
+                    const ts = new Date(e.timestamp * 1000).toLocaleString();
+                    const stepsHtml = (e.steps || []).map(s => {
+                        const statusColor = s.status === 'ok' ? '#10b981' : '#ef4444';
+                        const params = escHtml(JSON.stringify(s.params || {}));
+                        const result = escHtml(s.result || s.error || '');
+                        return `<div style="border-left:3px solid ${statusColor};padding:6px 12px;margin:4px 0;background:var(--pre-bg);border-radius:4px">
+                            <div style="display:flex;gap:6px;align-items:center;font-size:13px">
+                                <span class="badge ${s.status === 'ok' ? 'green' : 'red'}">${s.status}</span>
+                                <strong style="color:#60a5fa">${s.agent}</strong>
+                                <span style="color:var(--text-secondary)">/</span>
+                                <span class="badge" style="background:#dbeafe;color:#1e40af">${s.tool}</span>
+                                <span style="font-size:11px;color:var(--text-secondary)">${params}</span>
+                            </div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:4px;white-space:pre-wrap;max-height:80px;overflow:hidden">${result}</div>
+                        </div>`;
+                    }).join('');
+                    const summary = escHtml(e.summary || '');
+                    const task = escHtml(e.task || '');
+                    return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px">
+                        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
+                            <div style="font-size:11px;color:var(--text-secondary)">${ts}</div>
+                            <span class="badge green">${(e.steps||[]).length} adim</span>
+                        </div>
+                        <div style="font-weight:600;margin-bottom:6px">Task: ${task}</div>
+                        <details style="margin-bottom:8px">
+                            <summary style="cursor:pointer;font-size:13px;color:var(--text-secondary)">LLM Plan</summary>
+                            <pre style="margin-top:4px;font-size:11px;background:var(--pre-bg);color:var(--pre-text);padding:8px;border-radius:4px;overflow-x:auto">${escHtml(e.plan || '')}</pre>
+                        </details>
+                        <div style="margin:8px 0"><strong style="font-size:13px">Adimlar:</strong></div>
+                        ${stepsHtml}
+                        <div style="margin-top:8px;padding:8px;background:#d1fae5;color:#065f46;border-radius:6px;font-size:13px"><strong>Ozet:</strong> ${summary}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                document.getElementById('orch-history-box').innerHTML = `<div style="color:#ef4444;padding:12px">Yuklenemedi: ${escHtml(e.message)}</div>`;
+            }
+        }
+
         async function loadChat() {
             const data = await api('/api/gateway/agent/log?limit=50');
             const box = document.getElementById('chat-box');
@@ -505,6 +567,34 @@
             return d.innerHTML;
         }
 
+        async function loadDropletStatus() {
+            try {
+                const data = await api('/api/gateway/monitor/status');
+                const bar = document.getElementById('droplet-status-bar');
+                if (!data.ok || !data.droplets || !data.droplets.length) {
+                    bar.innerHTML = '';
+                    return;
+                }
+                bar.innerHTML = data.droplets.map(d => {
+                    const isOff = d.status === 'off';
+                    const bg = isOff ? '#fee2e2' : '#d1fae5';
+                    const color = isOff ? '#991b1b' : '#065f46';
+                    const label = isOff ? 'KAPALI' : d.status;
+                    const fix = d.fixed ? '<div style="font-size:11px;color:#92400e;margin-top:4px">🔧 Auto-fix uygulandi</div>' : '';
+                    return `<div style="background:var(--bg-card);border-radius:10px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.1);flex:1;min-width:160px;border-left:4px solid ${isOff ? '#ef4444' : '#10b981'}">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                            <strong style="font-size:16px">${escHtml(d.name)}</strong>
+                            <span class="badge" style="background:${bg};color:${color}">${label}</span>
+                        </div>
+                        ${fix}
+                        <div style="font-size:11px;color:#64748b;margin-top:4px">${isOff ? '⚠ Otomatik acilacak' : '☁ DO Droplet'}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                document.getElementById('droplet-status-bar').innerHTML = '';
+            }
+        }
+
         async function loadHostStatus() {
             try {
                 const data = await api('/api/gateway/monitor/status');
@@ -577,6 +667,7 @@
             if (name === 'servers') loadServers();
             if (name === 'agents') loadAgents();
             if (name === 'audit') loadAudit();
+            if (name === 'orch') loadOrchHistory();
             if (name === 'chat') loadChat();
         }
 
@@ -688,12 +779,15 @@
 
         loadRules();
         loadHostStatus();
+        loadDropletStatus();
         setInterval(() => {
             loadHostStatus();
+            loadDropletStatus();
             if (activeTab === 'rules') loadRules();
             if (activeTab === 'servers') loadServers();
             if (activeTab === 'agents') loadAgents();
             if (activeTab === 'audit') loadAudit();
+            if (activeTab === 'orch') loadOrchHistory();
             if (activeTab === 'chat') loadChat();
             loadLogStream();
         }, 1500);

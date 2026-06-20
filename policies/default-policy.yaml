@@ -33,6 +33,10 @@ rules:
   condition: tool_name in ["journalctl", "ufw_status", "ufw_allow", "reboot_host"]
   message: Remote system tools
   name: allow-remote-system
+- action: allow
+  condition: tool_name in ["list_droplets", "droplet_status", "power_on", "power_off", "ensure_running", "reboot_droplet", "ensure_all_running"]
+  message: DigitalOcean droplet management tools
+  name: allow-do-mcp
 - action: deny
   condition: params contains "init 0" or params contains "init 6" or params contains
     "sudo init" or params contains "rm -rf" or params contains "shutdown" or params

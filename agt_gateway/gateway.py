@@ -58,6 +58,10 @@ POLICY_PATH = os.getenv("AGT_POLICY_PATH", "policies/default-policy.yaml")
 _audit_store: list[dict] = []
 _audit_lock = threading.Lock()
 
+# Orchestrator execution history
+_orch_history: list[dict] = []
+_orch_history_lock = threading.Lock()
+
 
 class GatewayState:
     def __init__(self):
@@ -393,6 +397,30 @@ async def list_agents():
     return {"agents": sorted(all_agents)}
 
 
+@router.post("/orchestrator/history")
+async def save_orch_history(payload: dict):
+    with _orch_history_lock:
+        entry = {
+            "timestamp": time.time(),
+            "task": payload.get("task", ""),
+            "plan": payload.get("plan", ""),
+            "steps": payload.get("steps", []),
+            "summary": payload.get("summary", ""),
+            "result": payload.get("result", ""),
+        }
+        _orch_history.append(entry)
+        if len(_orch_history) > 100:
+            _orch_history.pop(0)
+    return {"status": "ok"}
+
+
+@router.get("/orchestrator/history")
+async def get_orch_history(limit: int = 20):
+    with _orch_history_lock:
+        entries = list(_orch_history[-limit:])
+    return sorted(entries, key=lambda x: x["timestamp"], reverse=True)
+
+
 @router.post("/agent/{agent_name}/ask")
 async def ask_agent(agent_name: str, req: ToolCallRequest):
     """Send a tool call request to another agent via MCP."""
@@ -461,7 +489,9 @@ async def get_monitor_status():
         text = result.get("result", {}).get("content", [{}])[0].get("text", "")
         lines = text.split("\n")
         hosts = []
+        droplets = []
         current_host = None
+        in_droplets = False
         for line in lines:
             if "[" in line and "]" in line and (line.strip().endswith("]:")):
                 h = line.split("[")[0].strip()
@@ -470,6 +500,19 @@ async def get_monitor_status():
                 hosts.append(current_host)
             elif current_host and "!" in line:
                 current_host["issues"].append(line.split("!")[-1].strip())
-        return {"ok": True, "hosts": hosts, "raw": text}
+            if "--- DO Droplets" in line:
+                in_droplets = True
+                continue
+            if in_droplets and line.strip().startswith(("✓", "🔧")):
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    dname = parts[1].rstrip(":")
+                    dstatus = parts[2] if len(parts) > 2 else "?"
+                    if not any(d["name"] == dname for d in droplets):
+                        fixed = "🔧" in line
+                        droplets.append({"name": dname, "status": dstatus, "fixed": fixed})
+            if in_droplets and line.strip().startswith("---"):
+                in_droplets = False
+        return {"ok": True, "hosts": hosts, "droplets": droplets, "raw": text}
     except Exception as e:
-        return {"ok": False, "error": str(e), "hosts": []}
+        return {"ok": False, "error": str(e), "hosts": [], "droplets": []}

@@ -6,7 +6,7 @@ import os, json, httpx
 from agents.base_agent import BaseAgent
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3-coder:480b-cloud")
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8080")
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:8080")
 
@@ -49,28 +49,30 @@ Rules:
 4. Never use orchestrator-agent itself
 5. Never use debian-mcp directly — use sysadmin-agent instead
 
-Agent guide (common tasks):
-- For listing hosts → use: sysadmin-agent list_hosts
-- For host status/monitoring → use: sysadmin-agent host_status
-- For updates/upgrades → use: sysadmin-agent update_all
-- For service management → use: sysadmin-agent restart_service
-- For disk alerts → use: sysadmin-agent disk_alert
-- For deployments → use: devops-agent deploy_service
-- For containers/logs → use: devops-agent container_status or logs_tail
-- For firewall/security → use: secops-agent firewall_status or security_audit
+IMPORTANT: For DigitalOcean droplets (zeus, hera, gokayCPU, master-openclaw):
+- To list all DO droplets → use: do-agent list_droplets
+- To check a droplet's power status → use: do-agent droplet_status {{"name": "droplet_name"}}
+- To power ON a droplet (prefer ensure_running — it waits for confirmation) → use: do-agent ensure_running {{"name": "droplet_name"}}
+- To power off a droplet → use: do-agent power_off {{"name": "droplet_name"}}
+- To check ALL droplets and turn on any that are off → use: do-agent ensure_all_running
 
-Format:
-TOOL: <agent-name> <tool-name> {{"param": "value"}}
 
-Example:
+
+Examples:
 User: list all hosts
 TOOL: sysadmin-agent list_hosts {{}}
 
-User: check cpu on zeus
+User: check cpu on zeus (server is running)
 TOOL: sysadmin-agent host_status {{"host_name": "zeus"}}
+
+User: zeus is offline check and turn it on
+TOOL: do-agent ensure_running {{"name": "zeus"}}
 
 User: deploy app to hera
 TOOL: devops-agent deploy_service {{"host_name": "hera", "service": "myapp"}}
+
+User: make sure all droplets are running
+TOOL: do-agent ensure_all_running {{}}
 """
 
 
@@ -95,13 +97,14 @@ def _ask(args: dict) -> str:
     prompt = SYSTEM_PROMPT.format(registry=registry_info)
     prompt += f"\n\nUser task: {task}\n\nPlan (one TOOL line per step):"
 
-    result = _ask_ollama(prompt)
-    lines = result.strip().split("\n")
+    raw_llm = _ask_ollama(prompt)
+    lines = raw_llm.strip().split("\n")
 
     # Debug: save raw response
     import sys
-    print(f"[ORCH DEBUG] RAW: {result[:200]}", file=sys.stderr, flush=True)
+    print(f"[ORCH DEBUG] RAW: {raw_llm[:200]}", file=sys.stderr, flush=True)
 
+    steps = []
     executed = []
     found_any_tool = False
     for line in lines:
@@ -121,6 +124,7 @@ def _ask(args: dict) -> str:
                 params = json.loads(parts[2])
             except json.JSONDecodeError as je:
                 executed.append(f"[SKIP] JSON parse error for {tool}: {je}")
+                steps.append({"agent": agent, "tool": tool, "params": params, "status": "error", "error": str(je)})
                 continue
         try:
             print(f"[ORCH DEBUG] Calling {agent}/{tool} params={params}", file=sys.stderr, flush=True)
@@ -133,11 +137,14 @@ def _ask(args: dict) -> str:
             content = data.get("result", {}).get("content", [{}])
             text = content[0].get("text", str(data)) if content else str(data)
             executed.append(f"[{agent}/{tool}] OK:\n{text[:500]}")
+            steps.append({"agent": agent, "tool": tool, "params": params, "status": "ok", "result": text[:500]})
         except Exception as e:
-            executed.append(f"[{agent}/{tool}] ERROR: {type(e).__name__}: {e}")
+            err = f"{type(e).__name__}: {e}"
+            executed.append(f"[{agent}/{tool}] ERROR: {err}")
+            steps.append({"agent": agent, "tool": tool, "params": params, "status": "error", "error": err})
 
     if not found_any_tool:
-        return f"LLM response did not contain TOOL lines.\n\nRaw:\n{result[:500]}"
+        return f"LLM response did not contain TOOL lines.\n\nRaw:\n{raw_llm[:500]}"
 
     all_output = "\n\n".join(executed)
     summary_prompt = f"""Task: {task}
@@ -147,7 +154,25 @@ Results from tools:
 
 Summarize what was done in 2-3 sentences in Turkish:"""
     summary = _ask_ollama(summary_prompt)
-    return f"=== Execution Results ===\n\n{all_output}\n\n=== Summary ===\n{summary}"
+    final = f"=== Execution Results ===\n\n{all_output}\n\n=== Summary ===\n{summary}"
+
+    # Save execution history to gateway
+    try:
+        httpx.post(
+            f"{GATEWAY_URL}/api/gateway/orchestrator/history",
+            json={
+                "task": task,
+                "plan": raw_llm,
+                "steps": steps,
+                "summary": summary,
+                "result": final,
+            },
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+    return final
 
 
 TOOL_FUNCS = {

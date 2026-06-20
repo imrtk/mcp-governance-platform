@@ -7,6 +7,7 @@ from agent_os.integrations.base import PatternType
 FILE_MCP_URL = os.getenv("FILE_MCP_URL", "http://127.0.0.1:8001/mcp")
 SHELL_MCP_URL = os.getenv("SHELL_MCP_URL", "http://127.0.0.1:8002/mcp")
 DEBIAN_MCP_URL = os.getenv("DEBIAN_MCP_URL", "http://127.0.0.1:8003/mcp")
+DO_MCP_URL = os.getenv("DO_MCP_URL", "http://127.0.0.1:8005/mcp")
 GOV_API_URL = os.getenv("GOV_API_URL", "http://127.0.0.1:8080")
 MCP_API_KEY = os.getenv("MCP_API_KEY", "")
 
@@ -43,6 +44,8 @@ policy = GovernancePolicy(
         "deb_list_upgradable", "deb_autoremove",
         "service_status", "service_restart", "service_start", "service_stop", "service_enable",
         "journalctl", "ufw_status", "ufw_allow", "reboot_host", "network",
+        "list_droplets", "droplet_status", "power_on", "power_off", "ensure_running", "reboot_droplet", "ensure_all_running",
+        "orchestrate",
     ],
     blocked_patterns=[
         (r";\s*(rm|del)\b", PatternType.REGEX),
@@ -371,6 +374,49 @@ def network(host_name: str = "", host: str = "", user: str = "", port: int = 22,
     if not allowed: return f"[GOVERNANCE DENIED] {reason}"
     return _remote_backend("network", args)
 
+# ── DigitalOcean droplet management ──
+
+@mcp.tool()
+def list_droplets() -> str:
+    allowed, reason = gateway.intercept_tool_call("vibe", "list_droplets", {})
+    if not allowed: return f"[GOVERNANCE DENIED] {reason}"
+    return _proxy_to(DO_MCP_URL, "list_droplets", {})
+
+@mcp.tool()
+def droplet_status(name: str = "", droplet_name: str = "") -> str:
+    args = {"name": name, "droplet_name": droplet_name}
+    allowed, reason = gateway.intercept_tool_call("vibe", "droplet_status", args)
+    if not allowed: return f"[GOVERNANCE DENIED] {reason}"
+    return _proxy_to(DO_MCP_URL, "droplet_status", args)
+
+@mcp.tool()
+def power_on(name: str = "", droplet_name: str = "") -> str:
+    args = {"name": name, "droplet_name": droplet_name}
+    allowed, reason = gateway.intercept_tool_call("vibe", "power_on", args)
+    if not allowed: return f"[GOVERNANCE DENIED] {reason}"
+    return _proxy_to(DO_MCP_URL, "power_on", args)
+
+@mcp.tool()
+def power_off(name: str = "", droplet_name: str = "") -> str:
+    args = {"name": name, "droplet_name": droplet_name}
+    allowed, reason = gateway.intercept_tool_call("vibe", "power_off", args)
+    if not allowed: return f"[GOVERNANCE DENIED] {reason}"
+    return _proxy_to(DO_MCP_URL, "power_off", args)
+
+@mcp.tool()
+def ensure_running(name: str = "", droplet_name: str = "", wait_seconds: int = 30) -> str:
+    args = {"name": name, "droplet_name": droplet_name, "wait_seconds": wait_seconds}
+    allowed, reason = gateway.intercept_tool_call("vibe", "ensure_running", args)
+    if not allowed: return f"[GOVERNANCE DENIED] {reason}"
+    return _proxy_to(DO_MCP_URL, "ensure_running", args)
+
+@mcp.tool()
+def reboot_droplet(name: str = "", droplet_name: str = "") -> str:
+    args = {"name": name, "droplet_name": droplet_name}
+    allowed, reason = gateway.intercept_tool_call("vibe", "reboot_droplet", args)
+    if not allowed: return f"[GOVERNANCE DENIED] {reason}"
+    return _proxy_to(DO_MCP_URL, "reboot_droplet", args)
+
 # ── Web / utility tools (built-in) ──
 
 @mcp.tool()
@@ -424,6 +470,24 @@ def todo(action: str, content: str = "") -> str:
         _save_todos([])
         return "All todos cleared"
     return "Invalid action. Use: list, add, done, clear"
+
+@mcp.tool()
+def orchestrate(task: str) -> str:
+    allowed, reason = gateway.intercept_tool_call("vibe", "orchestrate", {"task": task[:80]})
+    if not allowed: return f"[GOVERNANCE DENIED] {reason}"
+    try:
+        resp = httpx.post(
+            f"{GOV_API_URL}/api/gateway/agent/orchestrator-agent/ask",
+            json={"tool_name": "ask", "params": {"task": task}},
+            timeout=180,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        content = data.get("result", {}).get("content", [{}])
+        return content[0].get("text", str(data)) if content else str(data)
+    except Exception as e:
+        return f"[ORCHESTRATOR ERROR] {e}"
+
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
