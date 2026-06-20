@@ -1,0 +1,51 @@
+apiVersion: governance.toolkit/v2
+defaultAction: deny
+name: platform-default-policy
+rules:
+- action: allow
+  condition: tool_name in ["list_dir", "read_file", "search_files", "grep"]
+  name: allow-read-operations
+- action: require_approval
+  condition: tool_name == "write_file"
+  message: Write operation requires admin approval
+  name: write-requires-approval
+- action: allow
+  condition: tool_name in ["run_shell"]
+  message: Shell MCP with built-in allowlist
+  name: allow-shell-mcp
+- action: allow
+  condition: tool_name in ["system_info", "uptime", "disk_usage", "process_list"]
+  message: Local system tools
+  name: allow-local-system
+- action: allow
+  condition: tool_name in ["web_fetch", "web_search", "todo"]
+  message: Utility tools
+  name: allow-utilities
+- action: allow
+  condition: tool_name in ["list_hosts", "ssh_exec", "deb_update", "deb_upgrade", "deb_install", "deb_remove", "deb_search", "deb_list_upgradable", "deb_autoremove", "cpu_usage", "memory_info", "network"]
+  message: Remote Debian management
+  name: allow-debian
+- action: allow
+  condition: tool_name in ["service_status", "service_restart", "service_start", "service_stop", "service_enable"]
+  message: Remote service management
+  name: allow-services
+- action: allow
+  condition: tool_name in ["journalctl", "ufw_status", "ufw_allow", "reboot_host"]
+  message: Remote system tools
+  name: allow-remote-system
+- action: deny
+  condition: params contains "init 0" or params contains "init 6" or params contains
+    "sudo init" or params contains "rm -rf" or params contains "shutdown" or params
+    contains "poweroff" or params contains "halt" or params contains "sudo poweroff"
+    or params contains "sudo shutdown" or params contains "sudo halt" or params contains
+    "sudo reboot" or params contains "||" or params contains "&&"
+  message: Destructive action blocked by central policy
+  name: block-destructive-actions
+- action: log
+  condition: true
+  name: audit-all-calls
+- action: deny
+  condition: agent_call_count > 100
+  message: 'Rate limit exceeded: max 100 calls per agent'
+  name: rate-limit-agents
+version: 1.0.0

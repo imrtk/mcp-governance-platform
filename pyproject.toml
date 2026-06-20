@@ -1,0 +1,17 @@
+[project]
+name = "mcp-governance-platform"
+version = "0.1.0"
+description = "MCP Governance Platform - Centralized policy enforcement for MCP servers"
+requires-python = ">=3.11"
+dependencies = [
+    "agent-governance-toolkit[full]",
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "pyyaml",
+    "httpx",
+    "mcp[cli]>=1.28.0",
+]
+
+[project.scripts]
+mcp-governance = "main:app"

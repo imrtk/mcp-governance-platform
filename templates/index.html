@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>MCP Governance Platform</title>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --bg-card: #fff;
+            --text: #333;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --header-bg: #1a1a2e;
+            --tab-bg: #fff;
+            --tab-hover: #f8fafc;
+            --th-bg: #f8fafc;
+            --tr-hover: #f8fafc;
+            --modal-bg: #fff;
+            --input-bg: #fff;
+            --input-border: #d1d5db;
+            --yaml-bg: #f8fafc;
+            --pre-bg: #1e293b;
+            --pre-text: #e2e8f0;
+        }
+        body.dark {
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+            --header-bg: #020617;
+            --tab-bg: #1e293b;
+            --tab-hover: #334155;
+            --th-bg: #1e293b;
+            --tr-hover: #334155;
+            --modal-bg: #1e293b;
+            --input-bg: #0f172a;
+            --input-border: #475569;
+            --yaml-bg: #0f172a;
+            --pre-bg: #0f172a;
+            --pre-text: #e2e8f0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); transition: background .2s, color .2s; }
+        .header { background: var(--header-bg); color: #fff; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 22px; }
+        .header span { color: #4ade80; font-size: 14px; }
+        .theme-toggle { background: none; border: 1px solid rgba(255,255,255,.3); color: #fff; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+        .theme-toggle:hover { background: rgba(255,255,255,.1); }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: var(--bg-card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h2 { font-size: 16px; color: var(--text); margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+        .card.full { grid-column: 1 / -1; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge.green { background: #d1fae5; color: #065f46; }
+        .badge.red { background: #fee2e2; color: #991b1b; }
+        .badge.yellow { background: #fef3c7; color: #92400e; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        th { background: var(--th-bg); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+        tr:hover { background: var(--tr-hover); }
+        .actions { display: flex; gap: 6px; }
+        .actions button { padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .btn-edit { background: #dbeafe; color: #1e40af; }
+        .btn-del { background: #fee2e2; color: #991b1b; }
+        .btn-add { background: #1a1a2e; color: #fff; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .btn-add:hover { background: #16213e; }
+        .btn-save { background: #059669; color: #fff; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .btn-cancel { background: #e2e8f0; color: #475569; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
+        .modal.active { display: flex; }
+        .modal-content { background: var(--modal-bg); border-radius: 12px; padding: 24px; width: 520px; max-width: 90%; }
+        .modal-content h3 { margin-bottom: 16px; }
+        .modal-content label { display: block; font-size: 13px; font-weight: 600; margin-top: 12px; margin-bottom: 4px; color: var(--text-secondary); }
+        .modal-content input, .modal-content select, .modal-content textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--input-border); border-radius: 6px; font-size: 14px; background: var(--input-bg); color: var(--text); }
+        .modal-content textarea { font-family: monospace; min-height: 60px; }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+        .yaml-editor { width: 100%; min-height: 300px; font-family: 'Monaco', 'Menlo', monospace; font-size: 13px; padding: 12px; border: 1px solid var(--input-border); border-radius: 6px; background: var(--yaml-bg); color: var(--text); }
+        .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 14px; display: none; z-index: 200; }
+        .toast.success { background: #059669; display: block; }
+        .toast.error { background: #dc2626; display: block; }
+        .stat-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat { background: var(--bg-card); border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
+        .stat .num { font-size: 28px; font-weight: 700; color: var(--text); }
+        .stat .label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+        .tab-bar { display: flex; gap: 0; margin-bottom: 20px; background: var(--tab-bg); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .tab { padding: 12px 24px; cursor: pointer; font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-secondary); }
+        .tab:hover { background: var(--tab-hover); }
+        .tab.active { border-bottom-color: #1a1a2e; color: var(--text); font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        pre { background: var(--pre-bg); color: var(--pre-text); padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+        .inline-flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div><h1>MCP Governance Platform</h1></div>
+        <div style="display:flex;align-items:center;gap:12px">
+            <span>●</span> Çalışıyor — Policy Engine Aktif
+            <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙 Dark</button>
+        </div>
+    </div>
+    <div class="container">
+        <div class="stat-cards" id="stats"></div>
+
+        <div id="host-alert-banner" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600"></div>
+
+        <div class="host-status-bar" id="host-status-bar" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
+
+        <div class="tab-bar">
+            <div class="tab active" onclick="switchTab('rules')">Policy Rules</div>
+            <div class="tab" onclick="switchTab('yaml')">YAML Editor</div>
+            <div class="tab" onclick="switchTab('servers')">MCP Servers</div>
+            <div class="tab" onclick="switchTab('agents')">Agent'lar</div>
+            <div class="tab" onclick="switchTab('test')">Test</div>
+            <div class="tab" onclick="switchTab('audit')">Audit Log</div>
+            <div class="tab" onclick="switchTab('chat')">Agent Konuşmaları</div>
+            <div class="tab" onclick="switchTab('logstream')">Log Akışı</div>
+        </div>
+
+        <div id="tab-rules" class="tab-content active">
+            <div class="card full">
+                <div class="inline-flex" style="justify-content:space-between;margin-bottom:12px">
+                    <h2 style="border:none;margin:0;padding:0">Policy Kuralları</h2>
+                    <button class="btn-add" onclick="openRuleModal()">+ Kural Ekle</button>
+                </div>
+                <table>
+                    <thead><tr><th>Kural</th><th>Koşul</th><th>Aksiyon</th><th>Mesaj</th><th style="width:100px">İşlem</th></tr></thead>
+                    <tbody id="rules-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-yaml" class="tab-content">
+            <div class="card full">
+                <div class="inline-flex" style="justify-content:space-between;margin-bottom:12px">
+                    <h2 style="border:none;margin:0;padding:0">YAML Policy</h2>
+                    <button class="btn-save" onclick="saveYAML()">Kaydet & Reload</button>
+                </div>
+                <textarea class="yaml-editor" id="yaml-editor"></textarea>
+            </div>
+        </div>
+
+        <div id="tab-servers" class="tab-content">
+            <div class="card full">
+                <h2>Kayıtlı MCP Sunucuları</h2>
+                <table>
+                    <thead><tr><th>ID</th><th>İsim</th><th>URL</th><th>Platform</th><th>Durum</th><th>Tool Sayısı</th><th>Yetenekler</th></tr></thead>
+                    <tbody id="servers-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-agents" class="tab-content">
+            <div class="grid" id="agents-grid">
+            </div>
+        </div>
+
+        <div id="tab-audit" class="tab-content">
+            <div class="card full">
+                <div class="inline-flex" style="justify-content:space-between;margin-bottom:12px">
+                    <h2 style="border:none;margin:0;padding:0">Denetim Kaydı (Audit Log)</h2>
+                    <button class="btn-save" onclick="loadAudit()">Yenile</button>
+                </div>
+                <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
+                    <label style="font-size:13px">Göster:</label>
+                    <select id="audit-filter" onchange="loadAudit()" style="padding:6px;border:1px solid #d1d5db;border-radius:6px">
+                        <option value="all">Tümü</option>
+                        <option value="allowed">İzin Verilen</option>
+                        <option value="blocked">Engellenen</option>
+                    </select>
+                </div>
+                <div style="max-height:500px;overflow-y:auto">
+                    <table>
+                        <thead><tr><th>Saat</th><th>Ajan</th><th>Araç</th><th>Parametreler</th><th>Durum</th><th>Sebep</th></tr></thead>
+                        <tbody id="audit-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-chat" class="tab-content">
+            <div class="card full" style="margin-bottom:16px">
+                <h2>Orchestrator'a Task Gönder</h2>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                    <input id="orchestrator-task" placeholder='örn: "hera host status göster" veya "zeus ta disk kontrol"' style="flex:1;padding:10px 14px;border:1px solid var(--input-border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text)">
+                    <button class="btn-add" onclick="sendOrchestratorTask()">Gönder</button>
+                </div>
+                <pre id="orchestrator-result" style="margin-top:10px;display:none;max-height:400px;overflow-y:auto"></pre>
+            </div>
+            <div class="card full">
+                <div class="inline-flex" style="justify-content:space-between;margin-bottom:12px">
+                    <h2 style="border:none;margin:0;padding:0">Agent Konuşmaları</h2>
+                    <button class="btn-save" onclick="loadChat()">Yenile</button>
+                </div>
+                <div style="max-height:600px;overflow-y:auto" id="chat-box">
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-test" class="tab-content">
+            <div class="card full">
+                <h2>Policy Test</h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div>
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Agent ID</label>
+                        <input id="test-agent" value="test" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Tool Name</label>
+                        <input id="test-tool" value="read_file" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px">
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Params (JSON)</label>
+                        <input id="test-params" value='{"path":"/tmp/test.txt"}' style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace">
+                    </div>
+                </div>
+                <button class="btn-add" style="margin-top:12px" onclick="testPolicy()">Test Et</button>
+                <pre id="test-result" style="margin-top:12px;display:none"></pre>
+            </div>
+        </div>
+
+        <div id="tab-logstream" class="tab-content">
+            <div class="card full">
+                <div class="inline-flex" style="justify-content:space-between;margin-bottom:12px">
+                    <h2 style="border:none;margin:0;padding:0">Canlı Log Akışı</h2>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <span style="font-size:12px;color:var(--text-secondary)" id="log-count">0 olay</span>
+                        <button class="btn-save" onclick="clearLogStream()">Temizle</button>
+                        <button class="btn-add" id="log-pause-btn" onclick="toggleLogPause()">⏸ Durdur</button>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+                    <label style="font-size:13px;display:flex;align-items:center;gap:4px">
+                        <input type="checkbox" id="logf-audit" checked onchange="logFilterChange()"> Audit
+                    </label>
+                    <label style="font-size:13px;display:flex;align-items:center;gap:4px">
+                        <input type="checkbox" id="logf-agent" checked onchange="logFilterChange()"> Agent Msg
+                    </label>
+                    <label style="font-size:13px;display:flex;align-items:center;gap:4px">
+                        <input type="checkbox" id="logf-allowed" checked onchange="logFilterChange()"> Allowed
+                    </label>
+                    <label style="font-size:13px;display:flex;align-items:center;gap:4px">
+                        <input type="checkbox" id="logf-blocked" checked onchange="logFilterChange()"> Blocked
+                    </label>
+                    <input id="logf-search" placeholder="🔍 Filtrele..." style="flex:1;min-width:120px;padding:4px 10px;border:1px solid var(--input-border);border-radius:6px;font-size:13px;background:var(--input-bg);color:var(--text)" oninput="logFilterChange()">
+                </div>
+                <div id="log-stream-box" style="height:600px;overflow-y:auto;font-family:'Monaco','Menlo',monospace;font-size:12px;background:var(--pre-bg);color:var(--pre-text);border-radius:8px;padding:8px">
+                    <div style="text-align:center;color:#64748b;padding:20px">Yükleniyor...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="rule-modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Yeni Kural</h3>
+            <label>Kural Adı</label>
+            <input id="rule-name">
+            <label>Koşul</label>
+            <input id="rule-condition" placeholder='tool_name in ["read_file", "list_dir"]'>
+            <label>Aksiyon</label>
+            <select id="rule-action">
+                <option value="allow">allow</option>
+                <option value="deny">deny</option>
+                <option value="require_approval">require_approval</option>
+                <option value="log">log</option>
+            </select>
+            <label>Mesaj (opsiyonel)</label>
+            <input id="rule-message" placeholder="Açıklama mesajı">
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeRuleModal()">İptal</button>
+                <button class="btn-save" id="modal-save-btn" onclick="saveRule()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let editingRule = null;
+
+        function showToast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.className = `toast ${type}`;
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+
+        async function api(url, opts = {}) {
+            const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+            if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
+            return r.json();
+        }
+
+        async function loadRules() {
+            const data = await api('/api/gateway/policy');
+            const tbody = document.getElementById('rules-tbody');
+            tbody.innerHTML = data.rules.map(r => {
+                const badge = r.action === 'allow' ? 'green' : r.action === 'deny' ? 'red' : 'yellow';
+                return `<tr>
+                    <td><strong>${r.name}</strong></td>
+                    <td style="font-family:monospace;font-size:12px">${r.condition}</td>
+                    <td><span class="badge ${badge}">${r.action}</span></td>
+                    <td style="font-size:13px;color:#64748b">${r.message || '-'}</td>
+                    <td class="actions">
+                        <button class="btn-edit" onclick="editRule('${r.name}')">Düzenle</button>
+                        <button class="btn-del" onclick="deleteRule('${r.name}')">Sil</button>
+                    </td>
+                </tr>`;
+            }).join('');
+            const servers = await api('/api/registry/servers');
+            const totalTools = servers.filter(s => !s.name.endsWith('-agent')).reduce((s, v) => s + v.capabilities.length, 0);
+            document.getElementById('stats').innerHTML = [
+                { n: data.rules.length, l: 'Kural' },
+                { n: data.allowed_tools.length, l: 'İzinli Araç' },
+                { n: data.blocked_patterns.length, l: 'Bloklu Pattern' },
+                { n: totalTools, l: 'Toplam Tool' },
+                { n: data.name, l: 'Policy', big: true }
+            ].map(s => `<div class="stat"><div class="num">${s.big !== false ? s.n : ''}</div><div class="label">${s.l}</div></div>`).join('');
+        }
+
+        function openRuleModal(rule) {
+            editingRule = rule || null;
+            document.getElementById('modal-title').textContent = rule ? 'Kural Düzenle' : 'Yeni Kural';
+            document.getElementById('rule-name').value = rule ? rule.name : '';
+            document.getElementById('rule-condition').value = rule ? rule.condition : '';
+            document.getElementById('rule-action').value = rule ? rule.action : 'allow';
+            document.getElementById('rule-message').value = rule ? (rule.message || '') : '';
+            document.getElementById('rule-modal').classList.add('active');
+        }
+
+        function closeRuleModal() { document.getElementById('rule-modal').classList.remove('active'); editingRule = null; }
+
+        async function saveRule() {
+            const name = document.getElementById('rule-name').value.trim();
+            const condition = document.getElementById('rule-condition').value.trim();
+            const action = document.getElementById('rule-action').value;
+            const message = document.getElementById('rule-message').value.trim();
+            if (!name || !condition) { showToast('Ad ve koşul zorunlu', 'error'); return; }
+            try {
+                if (editingRule) {
+                    await api(`/api/gateway/policy/rules/${editingRule.name}`, { method: 'PUT', body: JSON.stringify({ name, condition, action, message }) });
+                    showToast(`"${name}" güncellendi`);
+                } else {
+                    await api('/api/gateway/policy/rules', { method: 'POST', body: JSON.stringify({ name, condition, action, message }) });
+                    showToast(`"${name}" eklendi`);
+                }
+                closeRuleModal(); loadRules();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function editRule(name) {
+            const data = await api('/api/gateway/policy');
+            const rule = data.rules.find(r => r.name === name);
+            if (rule) openRuleModal(rule);
+        }
+
+        async function deleteRule(name) {
+            if (!confirm(`"${name}" kuralını silmek istediğine emin misin?`)) return;
+            try {
+                await api(`/api/gateway/policy/rules/${name}`, { method: 'DELETE' });
+                showToast(`"${name}" silindi`);
+                loadRules();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function loadYAML() {
+            const data = await api('/api/gateway/policy/yaml');
+            document.getElementById('yaml-editor').value = data.yaml;
+        }
+
+        async function saveYAML() {
+            try {
+                await api('/api/gateway/policy/yaml', { method: 'PUT', body: JSON.stringify({ yaml: document.getElementById('yaml-editor').value }) });
+                showToast('Policy kaydedildi ve reload edildi');
+                loadRules();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function loadServers() {
+            const servers = await api('/api/registry/servers');
+            const tbody = document.getElementById('servers-tbody');
+            const mcps = servers.filter(s => !s.name.endsWith('-agent'));
+            tbody.innerHTML = mcps.map(s => `<tr>
+                <td>${s.id}</td>
+                <td><strong>${s.name}</strong></td>
+                <td style="font-family:monospace;font-size:12px">${s.url || '-'}</td>
+                <td><span class="badge ${s.platform === 'kubernetes' ? 'yellow' : 'green'}">${s.platform || 'local'}</span></td>
+                <td><span class="badge ${s.status === 'running' ? 'green' : 'red'}">${s.status}</span></td>
+                <td style="text-align:center;font-weight:600">${s.capabilities.length}</td>
+                <td>${s.capabilities.map(c => `<span class="badge green">${c}</span>`).join(' ')}</td>
+            </tr>`).join('');
+        }
+
+        async function loadAgents() {
+            const servers = await api('/api/registry/servers');
+            const agents = servers.filter(s => s.name.endsWith('-agent'));
+            const grid = document.getElementById('agents-grid');
+            grid.innerHTML = agents.map(a => {
+                const icon = a.name.includes('sysadmin') ? '🖥️' : a.name.includes('devops') ? '🚀' : '🔒';
+                return `<div class="card">
+                    <div style="font-size:32px;text-align:center;margin-bottom:8px">${icon}</div>
+                    <h2 style="text-align:center;border:none">${a.name}</h2>
+                    <p style="text-align:center;font-size:13px;color:var(--text-secondary);margin-bottom:12px">${a.description}</p>
+                    <div style="text-align:center;margin-bottom:12px">
+                        <span class="badge ${a.status === 'running' ? 'green' : 'red'}">${a.status}</span>
+                        <span class="badge green">${a.capabilities.length} tool</span>
+                        <span class="badge ${a.platform === 'kubernetes' ? 'yellow' : 'green'}">${a.platform}</span>
+                    </div>
+                    <div style="text-align:center;flex-wrap:wrap;display:flex;gap:4px;justify-content:center">
+                        ${a.capabilities.map(c => `<span class="badge green" style="font-size:11px">${c}</span>`).join('')}
+                    </div>
+                    <div style="margin-top:12px;display:flex;gap:6px;justify-content:center">
+                        <button class="btn-add" style="font-size:11px;padding:4px 10px" onclick="agentCall('${a.name}')">Çağır</button>
+                        <button class="btn-save" style="font-size:11px;padding:4px 10px" onclick="agentPing('${a.name}')">Ping</button>
+                    </div>
+                </div>`;
+            }).join('');
+            if (!agents.length) grid.innerHTML = '<div class="card full"><p style="text-align:center;color:var(--text-secondary)">Hiç agent kayıtlı değil</p></div>';
+        }
+
+        async function agentPing(name) {
+            try { const r = await fetch(`/api/gateway/agent/${name}/ask`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tool_name:'list_hosts',params:{}})}); alert(await r.text()); } catch(e) { alert('Hata: '+e.message); }
+        }
+
+        async function agentCall(name) {
+            const tool = prompt(`${name} hangi tool çağrılsın?`);
+            if (!tool) return;
+            try { const r = await fetch(`/api/gateway/agent/${name}/ask`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tool_name:tool,params:{}})}); const d = await r.json(); alert(JSON.stringify(d, null, 2)); } catch(e) { alert('Hata: '+e.message); }
+        }
+
+        async function loadChat() {
+            const data = await api('/api/gateway/agent/log?limit=50');
+            const box = document.getElementById('chat-box');
+            if (!data.length) { box.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px">Henüz konuşma yok</p>'; return; }
+            box.innerHTML = data.map(e => {
+                const ts = new Date(e.timestamp * 1000).toLocaleString();
+                const params = JSON.stringify(e.params || {});
+                const resp = JSON.stringify(e.response || {}).slice(0, 200);
+                const err = e.response && e.response.error;
+                return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px">
+                    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">${ts}</div>
+                    <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+                        <span class="badge green">${e.from || '?'}</span>
+                        <span style="color:var(--text-secondary)">→</span>
+                        <span class="badge yellow">${e.to}</span>
+                        <span class="badge" style="background:#dbeafe;color:#1e40af">${e.tool}</span>
+                        ${err ? '<span class="badge red">HATA</span>' : '<span class="badge green">OK</span>'}
+                    </div>
+                    <details style="font-size:12px">
+                        <summary style="cursor:pointer;color:var(--text-secondary)">Parametreler & Cevap</summary>
+                        <pre style="margin-top:4px;font-size:11px;background:var(--pre-bg);color:var(--pre-text);padding:8px;border-radius:4px;overflow-x:auto">Params: ${params}\n\nResponse: ${resp}</pre>
+                    </details>
+                </div>`;
+            }).join('');
+        }
+
+        async function testPolicy() {
+            const result = document.getElementById('test-result');
+            result.style.display = 'block';
+            result.textContent = 'Test ediliyor...';
+            try {
+                const data = await api('/api/gateway/govern', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        agent_id: document.getElementById('test-agent').value,
+                        tool_name: document.getElementById('test-tool').value,
+                        params: JSON.parse(document.getElementById('test-params').value || '{}')
+                    })
+                });
+                result.innerHTML = JSON.stringify(data, null, 2);
+            } catch (e) { result.textContent = `Hata: ${e.message}`; }
+        }
+
+        async function sendOrchestratorTask() {
+            const input = document.getElementById('orchestrator-task');
+            const result = document.getElementById('orchestrator-result');
+            const task = input.value.trim();
+            if (!task) return;
+            result.style.display = 'block';
+            result.textContent = '⏳ Orchestrator çalışıyor (30-60sn sürebilir)...';
+            input.disabled = true;
+            try {
+                const r = await fetch('/api/gateway/agent/orchestrator-agent/ask', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({tool_name: 'ask', params: {task}})
+                });
+                const data = await r.json();
+                const text = data?.result?.content?.[0]?.text || JSON.stringify(data, null, 2);
+                result.innerHTML = `<div style="background:var(--pre-bg);color:var(--pre-text);padding:16px;border-radius:8px;font-size:13px;white-space:pre-wrap">${escHtml(text)}</div>`;
+                loadChat();
+            } catch (e) {
+                result.innerHTML = `<div style="color:#dc2626">Hata: ${escHtml(e.message)}</div>`;
+            } finally {
+                input.disabled = false;
+            }
+        }
+
+        function escHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        async function loadHostStatus() {
+            try {
+                const data = await api('/api/gateway/monitor/status');
+                const bar = document.getElementById('host-status-bar');
+                const banner = document.getElementById('host-alert-banner');
+                if (!data.ok || !data.hosts.length) {
+                    bar.innerHTML = '<div class="card" style="flex:1;text-align:center;padding:12px;color:var(--text-secondary);font-size:13px">Host bilgisi alinamadi</div>';
+                    banner.style.display = 'none';
+                    return;
+                }
+                const statusMap = { ok: {bg:'#d1fae5',color:'#065f46',label:'OK'}, error:{bg:'#fee2e2',color:'#991b1b',label:'HATA'}, warning:{bg:'#fef3c7',color:'#92400e',label:'UYARI'} };
+                let hasError = false;
+                bar.innerHTML = data.hosts.map(h => {
+                    const s = statusMap[h.status] || statusMap.warning;
+                    if (h.status !== 'ok') hasError = true;
+                    const issues = h.issues.map(i => `<div style="font-size:11px;color:${s.color};padding:2px 0">! ${escHtml(i)}</div>`).join('');
+                    return `<div style="background:var(--bg-card);border-radius:10px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.1);flex:1;min-width:200px;border-left:4px solid ${s.bg === '#d1fae5' ? '#10b981' : s.bg === '#fee2e2' ? '#ef4444' : '#f59e0b'}">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                            <strong style="font-size:16px">${escHtml(h.name)}</strong>
+                            <span class="badge" style="background:${s.bg};color:${s.color}">${s.label}</span>
+                        </div>
+                        ${issues || '<div style="font-size:12px;color:#64748b">Saglikli</div>'}
+                    </div>`;
+                }).join('');
+                if (hasError) {
+                    const errCount = data.hosts.filter(h => h.status !== 'ok').length;
+                    banner.style.display = 'block';
+                    banner.style.background = '#fee2e2';
+                    banner.style.color = '#991b1b';
+                    banner.innerHTML = `⚠ ${errCount} hostta sorun var — ${data.hosts.filter(h => h.status !== 'ok').map(h => h.name).join(', ')}`;
+                } else {
+                    banner.style.display = 'none';
+                }
+            } catch (e) {
+                document.getElementById('host-status-bar').innerHTML = '';
+                document.getElementById('host-alert-banner').style.display = 'none';
+            }
+        }
+
+        async function loadAudit() {
+            const filter = document.getElementById('audit-filter').value;
+            const data = await api('/api/gateway/audit?limit=100');
+            const tbody = document.getElementById('audit-tbody');
+            tbody.innerHTML = data
+                .filter(e => filter === 'all' || (filter === 'allowed' && e.allowed) || (filter === 'blocked' && !e.allowed))
+                .map(e => {
+                    const badge = e.allowed ? 'green' : 'red';
+                    const label = e.allowed ? 'Allowed' : 'Blocked';
+                    const ts = new Date(e.timestamp * 1000).toLocaleTimeString();
+                    const params = JSON.stringify(e.parameters || {});
+                    return `<tr>
+                        <td style="font-size:12px;white-space:nowrap">${ts}</td>
+                        <td>${e.agent_id}</td>
+                        <td><strong>${e.tool_name}</strong></td>
+                        <td style="font-family:monospace;font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis">${params}</td>
+                        <td><span class="badge ${badge}">${label}</span></td>
+                        <td style="font-size:12px;color:#64748b">${e.reason || '-'}</td>
+                    </tr>`;
+                }).join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px">Kayıt bulunamadı</td></tr>';
+        }
+
+        let activeTab = 'rules';
+        function switchTab(name) {
+            activeTab = name;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[onclick*="${name}"]`).classList.add('active');
+            document.getElementById(`tab-${name}`).classList.add('active');
+            if (name === 'yaml') loadYAML();
+            if (name === 'servers') loadServers();
+            if (name === 'agents') loadAgents();
+            if (name === 'audit') loadAudit();
+            if (name === 'chat') loadChat();
+        }
+
+        function toggleTheme() {
+            const b = document.body;
+            b.classList.toggle('dark');
+            const isDark = b.classList.contains('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            document.getElementById('theme-btn').textContent = isDark ? '☀️ Light' : '🌙 Dark';
+        }
+        if (localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark'); document.getElementById('theme-btn').textContent = '☀️ Light'; }
+
+        let logStreamPaused = false;
+        let logStreamData = [];
+        let logStreamTimer = null;
+
+        async function loadLogStream() {
+            if (logStreamPaused) return;
+            try {
+                const [audit, agentLog] = await Promise.all([
+                    api('/api/gateway/audit?limit=200'),
+                    api('/api/gateway/agent/log?limit=200')
+                ]);
+                const now = Date.now() / 1000;
+                const merged = [];
+                audit.forEach(e => merged.push({
+                    ts: e.timestamp, type: 'audit', source: e.agent_id, tool: e.tool_name,
+                    status: e.allowed ? 'allowed' : 'blocked', detail: e.reason || JSON.stringify(e.parameters || {}),
+                    raw: e
+                }));
+                agentLog.forEach(e => merged.push({
+                    ts: e.timestamp, type: 'agent', source: (e.from || '?') + '→' + e.to, tool: e.tool,
+                    status: e.response && e.response.error ? 'error' : 'ok',
+                    detail: JSON.stringify(e.params || {}).slice(0, 150),
+                    raw: e
+                }));
+                merged.sort((a, b) => b.ts - a.ts);
+                logStreamData = merged.slice(0, 500);
+                renderLogStream();
+            } catch (e) {
+                document.getElementById('log-stream-box').innerHTML = `<div style="color:#ef4444;padding:12px">Log yüklenemedi: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        function renderLogStream() {
+            const box = document.getElementById('log-stream-box');
+            const showAudit = document.getElementById('logf-audit').checked;
+            const showAgent = document.getElementById('logf-agent').checked;
+            const showAllowed = document.getElementById('logf-allowed').checked;
+            const showBlocked = document.getElementById('logf-blocked').checked;
+            const search = document.getElementById('logf-search').value.toLowerCase();
+
+            const filtered = logStreamData.filter(e => {
+                if (e.type === 'audit' && !showAudit) return false;
+                if (e.type === 'agent' && !showAgent) return false;
+                if (e.status === 'allowed' && !showAllowed) return false;
+                if ((e.status === 'blocked' || e.status === 'error') && !showBlocked) return false;
+                if (search && !e.source.toLowerCase().includes(search) && !e.tool.toLowerCase().includes(search) && !e.detail.toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            document.getElementById('log-count').textContent = `${filtered.length} olay (${logStreamData.length} toplam)`;
+
+            if (!filtered.length) {
+                box.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px">Eşleşen olay yok</div>';
+                return;
+            }
+
+            const heightBefore = box.scrollHeight - box.scrollTop;
+            const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+
+            const colors = { allowed: '#4ade80', blocked: '#f87171', ok: '#60a5fa', error: '#fbbf24' };
+            const labels = { allowed: 'ALLOW', blocked: 'BLOCK', ok: 'OK', error: 'ERR' };
+
+            let html = '';
+            for (const e of filtered) {
+                const ts = new Date(e.ts * 1000).toLocaleTimeString();
+                const color = colors[e.status] || '#94a3b8';
+                const label = labels[e.status] || e.status;
+                const icon = e.type === 'audit' ? '🔍' : '💬';
+                html += `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05);align-items:start">
+                    <span style="color:#64748b;white-space:nowrap;min-width:75px">${ts}</span>
+                    <span style="color:${color};font-weight:700;min-width:44px">${label}</span>
+                    <span style="color:#94a3b8;min-width:28px">${icon}</span>
+                    <span style="color:#e2e8f0;min-width:140px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(e.source)}</span>
+                    <span style="color:#60a5fa;min-width:100px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(e.tool)}</span>
+                    <span style="color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(e.detail)}</span>
+                </div>`;
+            }
+            box.innerHTML = html;
+
+            if (atBottom) box.scrollTop = box.scrollHeight;
+        }
+
+        function toggleLogPause() {
+            logStreamPaused = !logStreamPaused;
+            document.getElementById('log-pause-btn').textContent = logStreamPaused ? '▶ Devam' : '⏸ Durdur';
+            if (!logStreamPaused) loadLogStream();
+        }
+
+        function clearLogStream() {
+            logStreamData = [];
+            renderLogStream();
+        }
+
+        function logFilterChange() {
+            renderLogStream();
+        }
+
+        loadRules();
+        loadHostStatus();
+        setInterval(() => {
+            loadHostStatus();
+            if (activeTab === 'rules') loadRules();
+            if (activeTab === 'servers') loadServers();
+            if (activeTab === 'agents') loadAgents();
+            if (activeTab === 'audit') loadAudit();
+            if (activeTab === 'chat') loadChat();
+            loadLogStream();
+        }, 1500);
+    </script>
+</body>
+</html>

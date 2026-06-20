@@ -1,0 +1,12 @@
+hosts:
+  hera:
+    host: 161.35.134.181
+    user: root
+    port: 22
+    description: "Debian 13 - DigitalOcean droplet"
+
+  zeus:
+    host: 159.203.109.102
+    user: root
+    port: 22
+    description: "Debian server"
