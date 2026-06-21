@@ -3,6 +3,9 @@ Orchestrator Agent: LLM-powered agent that plans and executes tasks
 by calling MCP tools through the gateway.
 """
 import os, json, httpx
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env")
 from agents.base_agent import BaseAgent
 
 LLM_API_URL = os.getenv("LLM_API_URL", "http://localhost:11434/v1/chat/completions")
