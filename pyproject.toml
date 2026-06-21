@@ -14,4 +14,5 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-governance = "main:app"
+mcp-gov = "mcp_governance.cli.main:main"
+mcp-gov-server = "main:app"
