@@ -44,7 +44,8 @@ SYSTEM_PROMPT = """You are an orchestration agent that controls MCP agents. Avai
 {registry}
 
 Rules:
-1. Output EXACTLY one TOOL line per step
+0. If the task is a simple question (math, trivia, chat) that needs no tools, answer directly without TOOL lines
+1. If tools are needed, output EXACTLY one TOOL line per step
 2. Use ONLY agent names from the list above
 3. Use ONLY tool names listed under that agent
 4. Never use orchestrator-agent itself
@@ -148,7 +149,7 @@ def _ask(args: dict) -> str:
             steps.append({"agent": agent, "tool": tool, "params": params, "status": "error", "error": err})
 
     if not found_any_tool:
-        return f"LLM response did not contain TOOL lines.\n\nRaw:\n{raw_llm[:500]}"
+        return raw_llm.strip() or f"LLM response did not contain TOOL lines.\n\nRaw:\n{raw_llm[:500]}"
 
     all_output = "\n\n".join(executed)
     summary_prompt = f"""Task: {task}
