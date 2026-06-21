@@ -3,6 +3,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 from mcp_governance.policy.models import ToolCallRequest, ToolCallResponse
 from mcp_governance.policy.engine import state
+from mcp_governance.audit.store import audit_store
 from registry.api import get_server_url
 
 router = APIRouter(tags=["govern"])
@@ -10,7 +11,7 @@ router = APIRouter(tags=["govern"])
 
 @router.post("/govern")
 async def govern_request(req: ToolCallRequest):
-    allowed, reason = state.intercept(req.agent_id, req.tool_name, req.params)
+    allowed, reason = state.intercept(req.agent_id, req.tool_name, req.params, audit_sink=audit_store)
     if not allowed:
         return ToolCallResponse(allowed=False, reason=reason)
     return ToolCallResponse(allowed=True, reason=reason, scanned=True)
@@ -18,7 +19,7 @@ async def govern_request(req: ToolCallRequest):
 
 @router.post("/govern/{mcp_name}")
 async def govern_mcp_request(mcp_name: str, req: ToolCallRequest):
-    allowed, reason = state.intercept(req.agent_id, req.tool_name, req.params)
+    allowed, reason = state.intercept(req.agent_id, req.tool_name, req.params, audit_sink=audit_store)
     if not allowed:
         return ToolCallResponse(allowed=False, reason=reason)
 
