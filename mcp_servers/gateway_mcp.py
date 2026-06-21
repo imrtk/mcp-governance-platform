@@ -1,4 +1,6 @@
 import os, json, httpx, urllib.parse, shutil
+from dotenv import load_dotenv
+load_dotenv()
 from pathlib import Path
 from mcp.server import FastMCP
 from agent_os.mcp_gateway import MCPGateway, GovernancePolicy, ApprovalStatus, ResponsePolicy

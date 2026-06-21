@@ -3,6 +3,8 @@ import subprocess
 import shlex
 import re
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 ALLOWLIST = {
     # file operations

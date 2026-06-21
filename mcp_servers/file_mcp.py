@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from pathlib import Path
 import uvicorn
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI(title="file-mcp", version="0.1.0")
 
