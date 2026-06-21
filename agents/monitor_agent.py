@@ -3,8 +3,9 @@ from agents.base_agent import BaseAgent
 
 DEBIAN_MCP_URL = os.getenv("DEBIAN_MCP_URL", "http://localhost:8003")
 DO_MCP_URL = os.getenv("DO_MCP_URL", "http://localhost:8005/mcp")
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3-coder:480b-cloud")
+LLM_API_URL = os.getenv("LLM_API_URL", "http://localhost:11434/v1/chat/completions")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen3-coder:480b-cloud")
 
 
 def _llm_analyze(host: str, svc: str, logs: str) -> str:
@@ -19,15 +20,19 @@ Reply with ONLY one word: YES or NO and a one-line reason.
 Example: YES - service exited cleanly, no config errors
 Example: NO - configuration error detected in logs"""
     try:
+        headers = {"Content-Type": "application/json"}
+        if LLM_API_KEY:
+            headers["Authorization"] = f"Bearer {LLM_API_KEY}"
         payload = {
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
+            "model": LLM_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
             "stream": False,
-            "options": {"temperature": 0, "num_predict": 100},
+            "temperature": 0,
+            "max_tokens": 100,
         }
-        resp = httpx.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=60)
+        resp = httpx.post(LLM_API_URL, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
-        result = resp.json().get("response", "").strip()
+        result = resp.json()["choices"][0]["message"]["content"].strip()
         return result
     except Exception as e:
         print(f"[monitor-agent] LLM error: {e}")

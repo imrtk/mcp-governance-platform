@@ -1,12 +1,13 @@
 """
 Orchestrator Agent: LLM-powered agent that plans and executes tasks
-by calling MCP tools through the gateway using Ollama.
+by calling MCP tools through the gateway.
 """
 import os, json, httpx
 from agents.base_agent import BaseAgent
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3-coder:480b-cloud")
+LLM_API_URL = os.getenv("LLM_API_URL", "http://localhost:11434/v1/chat/completions")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen3-coder:480b-cloud")
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8080")
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:8080")
 
@@ -76,19 +77,22 @@ TOOL: do-agent ensure_all_running {{}}
 """
 
 
-def _ask_ollama(prompt: str) -> str:
+def _ask_llm(prompt: str) -> str:
+    headers = {"Content-Type": "application/json"}
+    if LLM_API_KEY:
+        headers["Authorization"] = f"Bearer {LLM_API_KEY}"
     payload = {
-        "model": OLLAMA_MODEL,
-        "prompt": prompt,
+        "model": LLM_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
         "stream": False,
         "temperature": 0.1,
     }
     try:
-        resp = httpx.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=120)
+        resp = httpx.post(LLM_API_URL, json=payload, headers=headers, timeout=120)
         resp.raise_for_status()
-        return resp.json().get("response", "")
+        return resp.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        return f"[Ollama error: {e}]"
+        return f"[LLM error: {e}]"
 
 
 def _ask(args: dict) -> str:
@@ -97,7 +101,7 @@ def _ask(args: dict) -> str:
     prompt = SYSTEM_PROMPT.format(registry=registry_info)
     prompt += f"\n\nUser task: {task}\n\nPlan (one TOOL line per step):"
 
-    raw_llm = _ask_ollama(prompt)
+    raw_llm = _ask_llm(prompt)
     lines = raw_llm.strip().split("\n")
 
     # Debug: save raw response
@@ -153,7 +157,7 @@ Results from tools:
 {all_output}
 
 Summarize what was done in 2-3 sentences in Turkish:"""
-    summary = _ask_ollama(summary_prompt)
+    summary = _ask_llm(summary_prompt)
     final = f"=== Execution Results ===\n\n{all_output}\n\n=== Summary ===\n{summary}"
 
     # Save execution history to gateway
