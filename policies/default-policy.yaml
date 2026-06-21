@@ -34,6 +34,10 @@ rules:
   message: Remote system tools
   name: allow-remote-system
 - action: allow
+  condition: tool_name in ["list_vms", "vm_status", "power_on", "power_off", "reset_vm", "ensure_running", "vm_info", "get_cluster_resources", "list_datastores", "list_hosts", "create_snapshot", "deploy_from_template", "cluster_resources", "datastore_usage", "deploy_vm", "vm_summary"]
+  message: vCenter VM management tools
+  name: allow-vcenter-mcp
+- action: allow
   condition: tool_name in ["list_droplets", "droplet_status", "power_on", "power_off", "ensure_running", "reboot_droplet", "ensure_all_running"]
   message: DigitalOcean droplet management tools
   name: allow-do-mcp

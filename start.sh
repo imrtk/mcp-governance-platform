@@ -55,6 +55,9 @@ sleep 1
 uv run uvicorn mcp_servers.do_mcp:app --host 0.0.0.0 --port 8005 &
 sleep 1
 
+uv run uvicorn mcp_servers.vcenter_mcp:app --host 0.0.0.0 --port 8006 &
+sleep 1
+
 # ── Agent'lar ──
 info "Agent'lar baslatiliyor..."
 
@@ -74,6 +77,9 @@ uv run python -m agents.monitor_agent &
 sleep 1
 
 uv run python -m agents.do_agent &
+sleep 1
+
+uv run python -m agents.vcenter_agent &
 sleep 1
 
 # ── Governance platformu ──

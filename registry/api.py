@@ -89,6 +89,24 @@ _server_registry: dict[str, dict] = {
         "platform": "local",
         "capabilities": [],
     },
+    "vcenter-mcp": {
+        "id": 9,
+        "name": "vcenter-mcp",
+        "description": "vCenter VM management (power, deploy, snapshots, resources)",
+        "url": os.getenv("VCENTER_MCP_URL", "http://localhost:8006"),
+        "status": "running",
+        "platform": "local",
+        "capabilities": [],
+    },
+    "vcenter-agent": {
+        "id": 10,
+        "name": "vcenter-agent",
+        "description": "vCenter agent: list VMs, power on/off, deploy, snapshots, resource monitor",
+        "url": os.getenv("VCENTER_AGENT_URL", "http://localhost:8016"),
+        "status": "running",
+        "platform": "local",
+        "capabilities": [],
+    },
 }
 
 
