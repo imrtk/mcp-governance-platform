@@ -285,7 +285,6 @@ def _unwrap(data):
 def _get_tagged_vms(tag_name: str) -> set:
     """Get set of VM moId values that have a given vCenter tag via REST API."""
     if not VCENTER_HOST:
-        print("[tag-debug] VCENTER_HOST not set")
         return set()
     for api_prefix in ("/api", "/rest/com/vmware"):
         try:
@@ -295,29 +294,24 @@ def _get_tagged_vms(tag_name: str) -> set:
                     r = client.post(f"{base}/api/session", auth=(VCENTER_USER, VCENTER_PASSWORD),
                                    headers={"Content-Type": "application/json"})
                     if r.status_code != 201:
-                        print(f"[tag-debug] /api/session returned {r.status_code}")
                         continue
                     token = _unwrap(r.json())
                 else:
                     r = client.post(f"{base}/rest/com/vmware/cis/session", auth=(VCENTER_USER, VCENTER_PASSWORD),
                                    headers={"Content-Type": "application/json"})
                     if r.status_code != 200:
-                        print(f"[tag-debug] /rest/session returned {r.status_code}")
                         continue
                     token = _unwrap(r.json())
                     if not token:
-                        print("[tag-debug] /rest/session returned empty token")
                         continue
 
                 headers = {"vmware-api-session-id": token, "Content-Type": "application/json"}
 
                 r = client.get(f"{base}{api_prefix}/cis/tagging/tag", headers=headers)
                 if r.status_code != 200:
-                    print(f"[tag-debug] GET tags returned {r.status_code}")
                     continue
                 tags = _unwrap(r.json())
                 if not isinstance(tags, list):
-                    print(f"[tag-debug] GET tags returned non-list: {type(tags)}")
                     continue
                 tag_id = None
                 for t in tags:
@@ -325,7 +319,6 @@ def _get_tagged_vms(tag_name: str) -> set:
                         tag_id = t.get("id")
                         break
                 if not tag_id:
-                    print(f"[tag-debug] Tag '{tag_name}' not found among {len(tags)} tags")
                     return set()
 
                 if api_prefix == "/api":
@@ -335,19 +328,13 @@ def _get_tagged_vms(tag_name: str) -> set:
                     r = client.post(f"{base}/rest/com/vmware/cis/tagging/tag-association?id={tag_id}&~action=list-attached-objects",
                                   headers=headers)
                 if r.status_code != 200:
-                    print(f"[tag-debug] POST tag-association returned {r.status_code}")
                     continue
                 objs = _unwrap(r.json())
                 if not isinstance(objs, list):
-                    print(f"[tag-debug] tag-association returned non-list: {type(objs)}")
                     continue
-                result = {o["id"] for o in objs if o.get("type") == "VirtualMachine"}
-                print(f"[tag-debug] Tag '{tag_name}' -> {len(result)} VM(s) matched")
-                return result
-        except Exception as e:
-            print(f"[tag-debug] {api_prefix} error: {e}")
+                return {o["id"] for o in objs if o.get("type") == "VirtualMachine"}
+        except Exception:
             continue
-    print(f"[tag-debug] All REST API attempts failed for tag '{tag_name}'")
     return set()
 
 
