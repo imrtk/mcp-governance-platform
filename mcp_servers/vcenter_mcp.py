@@ -108,7 +108,7 @@ def _vm_summary(vm):
             "os": guest,
             "ip": ip,
         }
-    except Exception:
+    except Exception as e:
         return {"name": getattr(vm, 'name', 'unknown'), "error": str(e)}
 
 

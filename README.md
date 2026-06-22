@@ -105,6 +105,7 @@ open http://localhost:8080/dashboard
 | **shell-mcp** | 8002 | HTTP MCP | Shell komutları (allowlist) |
 | **debian-mcp** | 8003 | HTTP MCP | Remote Debian SSH yönetimi (Docker) |
 | **do-mcp** | 8005 | HTTP MCP | DigitalOcean droplet yönetimi |
+| **vcenter-mcp** | 8006 | HTTP MCP | vCenter VM yönetimi |
 | **orchestrator-agent** | 8013 | HTTP MCP | LLM planlama + delegasyon |
 | **monitor-agent** | 8014 | HTTP MCP | Host/servis/droplet izleme |
 | **sysadmin-agent** | 8010 | HTTP MCP | Sistem yönetimi |
@@ -120,6 +121,7 @@ open http://localhost:8080/dashboard
 | **orchestrator** | 8013 | Evet (plan+özet) | Task planlama, delegasyon | Monitor, kullanıcı (dashboard/Vibe/API) |
 | **monitor** | 8014 | Hayır | Host/servis/droplet izleme | Bağımsız loop (60sn) — tespit edince orchestrator'a bildirir |
 | **do-agent** | 8015 | Hayır | DO droplet power on/off/status | Orchestrator |
+| **vcenter-agent** | 8016 | Hayır | vCenter VM yönetimi (power, deploy, snapshot) | Orchestrator |
 | **sysadmin** | 8010 | Hayır | Host komutları, servis yönetimi | Orchestrator |
 | **devops** | 8011 | Hayır | Paket yönetimi, deploy | Orchestrator |
 | **secops** | 8012 | Hayır | Güvenlik taraması, UFW | Orchestrator |
@@ -182,6 +184,7 @@ curl http://localhost:8080/api/registry/servers
 │   ├── orchestrator.py        # LLM planlama + delegasyon
 │   ├── monitor_agent.py       # Periyodik izleme
 │   ├── do_agent.py            # DO droplet yönetimi
+│   ├── vcenter_agent.py       # vCenter VM yönetimi
 │   ├── sysadmin_agent.py      # Sistem yönetimi
 │   ├── devops_agent.py        # DevOps operasyonları
 │   └── secops_agent.py        # Güvenlik kontrolleri
@@ -193,6 +196,7 @@ curl http://localhost:8080/api/registry/servers
 │   ├── shell_mcp_http.py
 │   ├── debian_mcp.py
 │   ├── do_mcp.py
+│   ├── vcenter_mcp.py
 │   ├── gateway_mcp.py         # Vibe MCP proxy
 │   └── Dockerfile.debian-mcp
 ├── registry/

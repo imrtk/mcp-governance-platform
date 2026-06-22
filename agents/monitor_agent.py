@@ -96,6 +96,55 @@ def _call_mcp(tool: str, params: dict) -> str:
         return f"[ERROR] {e}"
 
 
+def _call_vcenter_agent(tool: str, params: dict) -> str:
+    try:
+        resp = httpx.post(
+            f"{GATEWAY_URL}/api/gateway/agent/vcenter-agent/ask",
+            json={"tool_name": tool, "params": params},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        contents = data.get("result", {}).get("content", [])
+        return "\n".join(c.get("text", "") for c in contents)
+    except Exception as e:
+        return f"[ERROR] {e}"
+
+
+def _check_vcenter_vms() -> list[dict]:
+    results = []
+    raw = _call_vcenter_agent("list_vms", {})
+    for line in raw.strip().split("\n"):
+        line = line.strip()
+        if not line or line.startswith("VMs") or line.startswith("VCENTER_HOST") or line.startswith("No"):
+            continue
+        parts = line.split()
+        if len(parts) >= 2:
+            vm_name = parts[0]
+            vm_status = parts[1]
+            vm_ip = parts[4] if len(parts) > 4 else "-"
+            result = {"name": vm_name, "power_state": vm_status, "ip": vm_ip}
+            if vm_status == "poweredOff":
+                print(f"[monitor-agent] vCenter off: {vm_name}, orchestrator'a bildiriliyor...")
+                fix_result = _call_orchestrator(f"{vm_name} VM'si kapali, ensure_running ile ac. vcenter-agent kullan")
+                result["auto_fix"] = fix_result
+                result["fixed"] = True
+                ts = datetime.datetime.now().strftime("%H:%M:%S")
+                with _alert_lock:
+                    _alert_history.append({
+                        "time": ts,
+                        "host": f"vcenter:{vm_name}",
+                        "service": "vm",
+                        "action": "orchestrator",
+                        "result": fix_result[:120],
+                    })
+                print(f"[monitor-agent] ORCHESTRATOR {vm_name}: {fix_result[:60]}")
+            else:
+                result["fixed"] = False
+            results.append(result)
+    return results
+
+
 MONITOR_INTERVAL = int(os.getenv("MONITOR_INTERVAL", "60"))
 CRITICAL_SERVICES = os.getenv("CRITICAL_SERVICES", "ssh,nginx,cron").split(",")
 CPU_THRESHOLD = float(os.getenv("CPU_THRESHOLD", "0.8"))
@@ -115,7 +164,7 @@ def _reset_budget():
 TOOLS = [
     {
         "name": "check_all",
-        "description": "Check CPU, memory, disk, services, and logs on all hosts",
+        "description": "Check CPU, memory, disk, services, logs, DO droplets, and vCenter VMs",
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
@@ -321,17 +370,21 @@ def _run_monitor_cycle():
         with _status_lock:
             _status_cache["droplets"] = droplets
 
+        vms = _check_vcenter_vms()
+        with _status_lock:
+            _status_cache["vms"] = vms
+
         with _status_lock:
             _status_cache["last_run"] = time.time()
             _status_cache["results"] = results
-            _status_cache["summary"] = _format_summary(results, droplets)
+            _status_cache["summary"] = _format_summary(results, droplets, vms)
         return results
     finally:
         _cycle_running = False
         _cycle_lock.release()
 
 
-def _format_summary(results: list, droplets: list = None) -> str:
+def _format_summary(results: list, droplets: list = None, vms: list = None) -> str:
     total = len(results)
     ok = sum(1 for r in results if r["status"] == "ok")
     warn = sum(1 for r in results if r["status"] == "warn")
@@ -351,6 +404,11 @@ def _format_summary(results: list, droplets: list = None) -> str:
         for d in droplets:
             icon = "✓" if not d.get("fixed") else "🔧"
             lines.append(f"  {icon} {d['name']}: {d['status']}")
+    if vms:
+        lines.append(f"\n--- vCenter VMs ({len(vms)}) ---")
+        for vm in vms:
+            icon = "✓" if not vm.get("fixed") else "🔧"
+            lines.append(f"  {icon} {vm['name']}: {vm['power_state']}")
     return "\n".join(lines)
 
 
@@ -403,6 +461,14 @@ def _check_all(args: dict) -> str:
                 out.append(f"  {icon} {d['name']}: {d['status']}")
                 if d.get("fixed"):
                     out.append(f"      Auto-fix: {d.get('auto_fix', '')[:80]}")
+        vms = _status_cache.get("vms", [])
+        if vms:
+            out.append(f"\n--- vCenter VMs ({len(vms)}) ---")
+            for vm in vms:
+                icon = "✓" if not vm.get("fixed") else "🔧"
+                out.append(f"  {icon} {vm['name']}: {vm['power_state']}")
+                if vm.get("fixed"):
+                    out.append(f"      Auto-fix: {vm.get('auto_fix', '')[:80]}")
     with _alert_lock:
         if _alert_history:
             out.append(f"\nSon mudahaleler ({len(_alert_history)}):")
@@ -443,6 +509,12 @@ def _status_report(args: dict) -> str:
             for d in droplets:
                 icon = "✓" if not d.get("fixed") else "🔧"
                 summary += f"\n  {icon} {d['name']}: {d['status']}"
+        vms = _status_cache.get("vms", [])
+        if vms:
+            summary += f"\n\n--- vCenter VMs ({len(vms)}) ---"
+            for vm in vms:
+                icon = "✓" if not vm.get("fixed") else "🔧"
+                summary += f"\n  {icon} {vm['name']}: {vm['power_state']}"
     with _alert_lock:
         if _alert_history:
             summary += f"\n\nSON MUDAHALELER ({len(_alert_history)}):"
