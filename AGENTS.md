@@ -17,7 +17,6 @@
 - README güncellendi ✅
 
 ## Yapılacaklar / Bilinen Eksikler
-- vcenter-agent'da `list_hosts` tool'u yok (vcenter_mcp'de var ama agent'da karşılığı yok)
 - vCenter MCP için Dockerfile gerekebilir
 - pyproject.toml'a pyvmomi bağımlılığı eklenmiş mi kontrol et
 - Diğer agent'lar (do, sysadmin, devops, secops, monitor) ve MCP'ler (file, shell, debian, do) registry'den çıkarıldı, geçici olarak devre dışı

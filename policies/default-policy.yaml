@@ -3,7 +3,7 @@ defaultAction: deny
 name: platform-default-policy
 rules:
 - action: allow
-  condition: tool_name in ["list_vms", "vm_status", "power_on", "power_off", "reset_vm", "ensure_running", "vm_info", "get_cluster_resources", "list_datastores", "list_hosts", "create_snapshot", "deploy_from_template", "cluster_resources", "datastore_usage", "deploy_vm", "vm_summary"]
+  condition: tool_name in ["vcenter_list_vms", "vcenter_vm_status", "vcenter_power_on", "vcenter_power_off", "vcenter_reset_vm", "vcenter_ensure_running", "vcenter_vm_info", "vcenter_cluster_resources", "vcenter_list_datastores", "vcenter_list_hosts", "vcenter_create_snapshot", "vcenter_deploy_vm", "vcenter_datastore_usage", "vcenter_vm_summary"]
   message: vCenter VM management tools
   name: allow-vcenter
 - action: allow

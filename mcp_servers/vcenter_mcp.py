@@ -114,12 +114,12 @@ def _vm_summary(vm):
 
 TOOLS = [
     {
-        "name": "list_vms",
+        "name": "vcenter_list_vms",
         "description": "List all VMs in the datacenter with power state, CPU, RAM, OS",
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
-        "name": "vm_status",
+        "name": "vcenter_vm_status",
         "description": "Get detailed status of a specific VM",
         "inputSchema": {
             "type": "object",
@@ -130,7 +130,7 @@ TOOLS = [
         },
     },
     {
-        "name": "power_on",
+        "name": "vcenter_power_on",
         "description": "Power on a VM that is powered off",
         "inputSchema": {
             "type": "object",
@@ -141,7 +141,7 @@ TOOLS = [
         },
     },
     {
-        "name": "power_off",
+        "name": "vcenter_power_off",
         "description": "Gracefully shut down a VM (guest OS shutdown)",
         "inputSchema": {
             "type": "object",
@@ -153,7 +153,7 @@ TOOLS = [
         },
     },
     {
-        "name": "reset_vm",
+        "name": "vcenter_reset_vm",
         "description": "Reset/reboot a VM",
         "inputSchema": {
             "type": "object",
@@ -164,7 +164,7 @@ TOOLS = [
         },
     },
     {
-        "name": "vm_info",
+        "name": "vcenter_vm_info",
         "description": "Get comprehensive info about a VM including networks, disks, snapshots",
         "inputSchema": {
             "type": "object",
@@ -175,22 +175,22 @@ TOOLS = [
         },
     },
     {
-        "name": "get_cluster_resources",
+        "name": "vcenter_cluster_resources",
         "description": "Get cluster resource usage summary (CPU, memory, storage)",
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
-        "name": "list_datastores",
+        "name": "vcenter_list_datastores",
         "description": "List all datastores with capacity and free space",
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
-        "name": "list_hosts",
+        "name": "vcenter_list_hosts",
         "description": "List ESXi hosts with connection state and resource usage",
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
-        "name": "create_snapshot",
+        "name": "vcenter_create_snapshot",
         "description": "Create a snapshot of a VM",
         "inputSchema": {
             "type": "object",
@@ -204,7 +204,7 @@ TOOLS = [
         },
     },
     {
-        "name": "deploy_from_template",
+        "name": "vcenter_deploy_vm",
         "description": "Deploy a new VM from a template",
         "inputSchema": {
             "type": "object",
@@ -508,17 +508,17 @@ def _wait_task(task, timeout=300):
 
 
 TOOL_FUNCS = {
-    "list_vms": _list_vms,
-    "vm_status": _vm_status,
-    "power_on": _power_on,
-    "power_off": _power_off,
-    "reset_vm": _reset_vm,
-    "vm_info": _vm_info,
-    "get_cluster_resources": _get_cluster_resources,
-    "list_datastores": _list_datastores,
-    "list_hosts": _list_hosts,
-    "create_snapshot": _create_snapshot,
-    "deploy_from_template": _deploy_from_template,
+    "vcenter_list_vms": _list_vms,
+    "vcenter_vm_status": _vm_status,
+    "vcenter_power_on": _power_on,
+    "vcenter_power_off": _power_off,
+    "vcenter_reset_vm": _reset_vm,
+    "vcenter_vm_info": _vm_info,
+    "vcenter_cluster_resources": _get_cluster_resources,
+    "vcenter_list_datastores": _list_datastores,
+    "vcenter_list_hosts": _list_hosts,
+    "vcenter_create_snapshot": _create_snapshot,
+    "vcenter_deploy_vm": _deploy_from_template,
 }
 
 app = FastAPI(title="vcenter-mcp")

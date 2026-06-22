@@ -113,7 +113,7 @@ def _call_vcenter_agent(tool: str, params: dict) -> str:
 
 def _check_vcenter_vms() -> list[dict]:
     results = []
-    raw = _call_vcenter_agent("list_vms", {})
+    raw = _call_vcenter_agent("vcenter_list_vms", {})
     for line in raw.strip().split("\n"):
         line = line.strip()
         if not line or line.startswith("VMs") or line.startswith("VCENTER_HOST") or line.startswith("No"):
@@ -126,7 +126,7 @@ def _check_vcenter_vms() -> list[dict]:
             result = {"name": vm_name, "power_state": vm_status, "ip": vm_ip}
             if vm_status == "poweredOff":
                 print(f"[monitor-agent] vCenter off: {vm_name}, orchestrator'a bildiriliyor...")
-                fix_result = _call_orchestrator(f"{vm_name} VM'si kapali, ensure_running ile ac. vcenter-agent kullan")
+                fix_result = _call_orchestrator(f"{vm_name} VM'si kapali, vcenter_ensure_running ile ac. vcenter-agent kullan")
                 result["auto_fix"] = fix_result
                 result["fixed"] = True
                 ts = datetime.datetime.now().strftime("%H:%M:%S")
