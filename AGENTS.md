@@ -18,6 +18,7 @@
 
 ## Yapılacaklar / Bilinen Eksikler
 - monitor-agent aktif ve otonom: her 60 sn'de VM'leri kontrol edip kapalıları orchestrator üzerinden açar ✅
+- vCenter Tag ile monitor'den muaf VM'ler: `MONITOR_IGNORE_TAG="monitor-ignore"` tag'ine sahip VM'ler atlanır ✅
 - vCenter MCP için Dockerfile gerekebilir
 - pyproject.toml'a pyvmomi bağımlılığı eklenmiş mi kontrol et
 - Diğer agent'lar (do, sysadmin, devops, secops, monitor) ve MCP'ler (file, shell, debian, do) registry'den çıkarıldı, geçici olarak devre dışı

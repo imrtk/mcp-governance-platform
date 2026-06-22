@@ -6,6 +6,7 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen3-coder:480b-cloud")
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8080")
 MONITOR_INTERVAL = int(os.getenv("MONITOR_INTERVAL", "60"))
+MONITOR_IGNORE_TAG = os.getenv("MONITOR_IGNORE_TAG", "monitor-ignore")
 
 _agent_instance = None
 _alert_history: list[dict] = []
@@ -50,7 +51,7 @@ def _call_orchestrator(task: str) -> str:
 
 def _check_vcenter_vms() -> list[dict]:
     results = []
-    raw = _call_vcenter_agent("vcenter_list_vms", {})
+    raw = _call_vcenter_agent("vcenter_list_vms", {"exclude_tag": MONITOR_IGNORE_TAG})
     for line in raw.strip().split("\n"):
         line = line.strip()
         if not line or line.startswith("VMs") or line.startswith("VCENTER_HOST") or line.startswith("No"):

@@ -116,7 +116,12 @@ TOOLS = [
     {
         "name": "vcenter_list_vms",
         "description": "List all VMs in the datacenter with power state, CPU, RAM, OS",
-        "inputSchema": {"type": "object", "properties": {}},
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "exclude_tag": {"type": "string", "description": "Optional tag name; VMs with this tag are excluded from results"},
+            },
+        },
     },
     {
         "name": "vcenter_vm_status",
@@ -221,7 +226,20 @@ TOOLS = [
 ]
 
 
+def _vm_has_tag(vm, tag_name: str) -> bool:
+    try:
+        content = _get_content()
+        if not hasattr(content, 'taggingManager') or not content.taggingManager:
+            return False
+        tagging = content.taggingManager
+        tags = tagging.ListTagsForObject(vm)
+        return any(t.name == tag_name for t in tags)
+    except Exception:
+        return False
+
+
 def _list_vms(args: dict) -> str:
+    exclude_tag = args.get("exclude_tag", "")
     if not VCENTER_HOST:
         return "VCENTER_HOST environment variable not set"
     content = _get_content()
@@ -233,6 +251,8 @@ def _list_vms(args: dict) -> str:
         return "No VMs found in datacenter"
     lines = []
     for vm in sorted(vms, key=lambda v: v.name.lower()):
+        if exclude_tag and _vm_has_tag(vm, exclude_tag):
+            continue
         s = _vm_summary(vm)
         if "error" in s:
             lines.append(f"  {s['name']:25s} ERROR: {s['error']}")

@@ -8,7 +8,12 @@ TOOLS = [
     {
         "name": "vcenter_list_vms",
         "description": "List all VMs with power state, CPU, RAM, OS, IP",
-        "inputSchema": {"type": "object", "properties": {}},
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "exclude_tag": {"type": "string", "description": "Optional tag name; VMs with this tag are excluded"},
+            },
+        },
     },
     {
         "name": "vcenter_vm_status",
@@ -139,7 +144,8 @@ def _call(tool: str, params: dict) -> str:
 
 
 def _list_vms(args: dict) -> str:
-    return _call("vcenter_list_vms", {})
+    exclude_tag = args.get("exclude_tag", "")
+    return _call("vcenter_list_vms", {"exclude_tag": exclude_tag})
 
 
 def _vm_status(args: dict) -> str:
