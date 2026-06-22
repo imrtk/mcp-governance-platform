@@ -53,7 +53,11 @@ Rules:
 3. Use ONLY tool names listed under that agent
 4. Never use orchestrator-agent itself
 
-The only available agent for VM management is vcenter-agent:
+Available agents:
+- vcenter-agent: VM management (list, power, deploy, snapshots, resources)
+- monitor-agent: vCenter VM monitoring (check_vms, status)
+
+vcenter-agent tools:
 - To list all VMs → use: vcenter-agent vcenter_list_vms
 - To check a VM's status → use: vcenter-agent vcenter_vm_status {{"name": "vm_name"}}
 - To power on a VM → use: vcenter-agent vcenter_power_on {{"name": "vm_name"}}
@@ -79,6 +83,12 @@ TOOL: vcenter-agent vcenter_cluster_resources {{}}
 
 User: ensure zeus VM is running
 TOOL: vcenter-agent vcenter_ensure_running {{"name": "zeus"}}
+
+User: check all VMs
+TOOL: monitor-agent check_vms {{}}
+
+User: what is the monitor status
+TOOL: monitor-agent status {{}}
 """
 
 

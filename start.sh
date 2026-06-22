@@ -40,6 +40,10 @@ info "vcenter-agent baslatiliyor (8016)..."
 uv run python -m agents.vcenter_agent &
 sleep 1
 
+info "monitor-agent baslatiliyor (8014)..."
+uv run python -m agents.monitor_agent &
+sleep 1
+
 # ── Governance platformu ──
 info "Governance platformu baslatiliyor (8080)..."
 uv run python main.py

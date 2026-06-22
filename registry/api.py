@@ -44,6 +44,15 @@ _server_registry: dict[str, dict] = {
         "platform": "local",
         "capabilities": [],
     },
+    "monitor-agent": {
+        "id": 4,
+        "name": "monitor-agent",
+        "description": "vCenter VM monitor: checks powered-off VMs and triggers auto-fix",
+        "url": os.getenv("MONITOR_AGENT_URL", "http://localhost:8014"),
+        "status": "running",
+        "platform": "local",
+        "capabilities": [],
+    },
 }
 
 

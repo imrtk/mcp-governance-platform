@@ -10,6 +10,10 @@ rules:
   condition: tool_name in ["ask"]
   message: Orchestrator ask tool
   name: allow-orchestrator
+- action: allow
+  condition: tool_name in ["check_vms", "status"]
+  message: Monitor agent tools
+  name: allow-monitor
 - action: deny
   condition: params contains "init 0" or params contains "init 6" or params contains
     "sudo init" or params contains "rm -rf" or params contains "shutdown" or params
