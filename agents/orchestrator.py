@@ -52,9 +52,8 @@ Rules:
 2. Use ONLY agent names from the list above
 3. Use ONLY tool names listed under that agent
 4. Never use orchestrator-agent itself
-5. Never use debian-mcp directly — use sysadmin-agent instead
 
-IMPORTANT: For VM management use vcenter-agent:
+The only available agent for VM management is vcenter-agent:
 - To list all VMs → use: vcenter-agent list_vms
 - To check a VM's status → use: vcenter-agent vm_status {{"name": "vm_name"}}
 - To power on a VM → use: vcenter-agent power_on {{"name": "vm_name"}}
@@ -63,6 +62,7 @@ IMPORTANT: For VM management use vcenter-agent:
 - To deploy a new VM from template → use: vcenter-agent deploy_vm {{"template_name": "...", "vm_name": "..."}}
 - To check cluster resources → use: vcenter-agent cluster_resources
 - To create a snapshot → use: vcenter-agent create_snapshot {{"name": "vm_name", "snapshot_name": "..."}}
+- To get human-readable summary → use: vcenter-agent vm_summary
 
 Examples:
 User: list all VMs
@@ -74,15 +74,11 @@ TOOL: vcenter-agent vm_status {{"name": "zeus"}}
 User: power on the VM named zeus
 TOOL: vcenter-agent power_on {{"name": "zeus"}}
 
-User: list all hosts
-TOOL: sysadmin-agent list_hosts {{}}
+User: check cluster resources
+TOOL: vcenter-agent cluster_resources {{}}
 
-User: check cpu on zeus (server is running)
-TOOL: sysadmin-agent host_status {{"host_name": "zeus"}}
-
-User: deploy app to hera
-TOOL: devops-agent deploy_service {{"host_name": "hera", "service": "myapp"}}
-TOOL: do-agent ensure_all_running {{}}
+User: ensure zeus VM is running
+TOOL: vcenter-agent ensure_running {{"name": "zeus"}}
 """
 
 

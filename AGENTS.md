@@ -21,6 +21,8 @@
 - vCenter MCP için Dockerfile gerekebilir
 - pyproject.toml'a pyvmomi bağımlılığı eklenmiş mi kontrol et
 - Diğer agent'lar (do, sysadmin, devops, secops, monitor) ve MCP'ler (file, shell, debian, do) registry'den çıkarıldı, geçici olarak devre dışı
+- start.sh sadece vcenter-mcp + orchestrator + vcenter-agent + gateway başlatacak şekilde sadeleştirildi
+- Orchestrator prompt'u sadece vcenter-agent örnekleri içerecek şekilde güncellendi
 
 ## Commit Geçmişi (son)
 - `8040b81` - orchestrator prompt'a vcenter-agent tool'ları eklendi
