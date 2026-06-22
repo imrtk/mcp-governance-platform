@@ -51,7 +51,7 @@ def _call_orchestrator(task: str) -> str:
 
 def _check_vcenter_vms() -> list[dict]:
     results = []
-    raw = _call_vcenter_agent("vcenter_list_vms", {"exclude_tag": MONITOR_IGNORE_TAG})
+    raw = _call_vcenter_agent("vcenter_list_vms", {"exclude_tag": MONITOR_IGNORE_TAG, "exclude_templates": True})
     for line in raw.strip().split("\n"):
         line = line.strip()
         if not line or line.startswith("VMs") or line.startswith("VCENTER_HOST") or line.startswith("No"):

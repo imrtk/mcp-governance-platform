@@ -128,6 +128,18 @@ TOOLS = [
         "description": "Get a human-readable summary of all VMs and cluster health",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "vcenter_vm_has_tag",
+        "description": "Check if a VM has a specific tag (checks annotation first, then vCenter tagging API)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "VM name"},
+                "tag_name": {"type": "string", "description": "Tag name to check"},
+            },
+            "required": ["name", "tag_name"],
+        },
+    },
 ]
 
 _agent_instance = None
@@ -145,7 +157,8 @@ def _call(tool: str, params: dict) -> str:
 
 def _list_vms(args: dict) -> str:
     exclude_tag = args.get("exclude_tag", "")
-    return _call("vcenter_list_vms", {"exclude_tag": exclude_tag})
+    exclude_templates = args.get("exclude_templates", False)
+    return _call("vcenter_list_vms", {"exclude_tag": exclude_tag, "exclude_templates": exclude_templates})
 
 
 def _vm_status(args: dict) -> str:
@@ -223,6 +236,12 @@ def _vm_summary(args: dict) -> str:
     return f"=== Cluster Resources ===\n\n{cluster_raw}\n\n=== VMs ===\n\n{vms_raw}"
 
 
+def _vm_has_tag(args: dict) -> str:
+    name = args.get("name", "")
+    tag_name = args.get("tag_name", "")
+    return _call("vcenter_vm_has_tag", {"name": name, "tag_name": tag_name})
+
+
 TOOL_FUNCS = {
     "vcenter_list_vms": _list_vms,
     "vcenter_vm_status": _vm_status,
@@ -237,6 +256,7 @@ TOOL_FUNCS = {
     "vcenter_create_snapshot": _create_snapshot,
     "vcenter_deploy_vm": _deploy_vm,
     "vcenter_vm_summary": _vm_summary,
+    "vcenter_vm_has_tag": _vm_has_tag,
 }
 
 if __name__ == "__main__":
