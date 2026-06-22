@@ -343,17 +343,12 @@ def _list_vms(args: dict) -> str:
     if not vms:
         return "No VMs found in datacenter"
 
-    tagging_available = hasattr(content, 'taggingManager') and bool(content.taggingManager)
-    exclude_mo_ids = _get_tagged_vms(exclude_tag) if exclude_tag and not tagging_available else set()
+    exclude_mo_ids = _get_tagged_vms(exclude_tag) if exclude_tag else set()
 
     lines = []
     for vm in sorted(vms, key=lambda v: v.name.lower()):
-        if exclude_tag:
-            if tagging_available:
-                if _vm_has_tag(vm, exclude_tag):
-                    continue
-            elif vm._moId in exclude_mo_ids or _vm_has_tag(vm, exclude_tag):
-                continue
+        if exclude_tag and (vm._moId in exclude_mo_ids or _vm_has_tag(vm, exclude_tag)):
+            continue
         is_template = getattr(vm.summary.config, 'template', False)
         if exclude_templates and is_template:
             continue
