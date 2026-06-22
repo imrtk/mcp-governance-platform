@@ -54,29 +54,34 @@ Rules:
 4. Never use orchestrator-agent itself
 5. Never use debian-mcp directly — use sysadmin-agent instead
 
-IMPORTANT: For DigitalOcean droplets (zeus, hera, gokayCPU, master-openclaw):
-- To list all DO droplets → use: do-agent list_droplets
-- To check a droplet's power status → use: do-agent droplet_status {{"name": "droplet_name"}}
-- To power ON a droplet (prefer ensure_running — it waits for confirmation) → use: do-agent ensure_running {{"name": "droplet_name"}}
-- To power off a droplet → use: do-agent power_off {{"name": "droplet_name"}}
-- To check ALL droplets and turn on any that are off → use: do-agent ensure_all_running
-
-
+IMPORTANT: For VM management use vcenter-agent:
+- To list all VMs → use: vcenter-agent list_vms
+- To check a VM's status → use: vcenter-agent vm_status {{"name": "vm_name"}}
+- To power on a VM → use: vcenter-agent power_on {{"name": "vm_name"}}
+- To power off a VM → use: vcenter-agent power_off {{"name": "vm_name"}}
+- To ensure a VM is running → use: vcenter-agent ensure_running {{"name": "vm_name"}}
+- To deploy a new VM from template → use: vcenter-agent deploy_vm {{"template_name": "...", "vm_name": "..."}}
+- To check cluster resources → use: vcenter-agent cluster_resources
+- To create a snapshot → use: vcenter-agent create_snapshot {{"name": "vm_name", "snapshot_name": "..."}}
 
 Examples:
+User: list all VMs
+TOOL: vcenter-agent list_vms {{}}
+
+User: check status of zeus VM
+TOOL: vcenter-agent vm_status {{"name": "zeus"}}
+
+User: power on the VM named zeus
+TOOL: vcenter-agent power_on {{"name": "zeus"}}
+
 User: list all hosts
 TOOL: sysadmin-agent list_hosts {{}}
 
 User: check cpu on zeus (server is running)
 TOOL: sysadmin-agent host_status {{"host_name": "zeus"}}
 
-User: zeus is offline check and turn it on
-TOOL: do-agent ensure_running {{"name": "zeus"}}
-
 User: deploy app to hera
 TOOL: devops-agent deploy_service {{"host_name": "hera", "service": "myapp"}}
-
-User: make sure all droplets are running
 TOOL: do-agent ensure_all_running {{}}
 """
 
