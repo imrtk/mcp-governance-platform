@@ -9,3 +9,9 @@ GRANT CONNECT ON DATABASE mcp_platform TO mcp_user;
 CREATE USER mcp_admin WITH PASSWORD 'admin_pass';
 GRANT CONNECT ON DATABASE mcp_platform TO mcp_admin;
 GRANT ALL PRIVILEGES ON DATABASE mcp_platform TO mcp_admin;
+
+-- PostgreSQL 15+: public schema'da CREATE yetkisi kalkti, acikca verilmeli
+\c mcp_platform
+GRANT USAGE ON SCHEMA public TO mcp_user;
+GRANT USAGE ON SCHEMA public TO mcp_admin;
+GRANT CREATE ON SCHEMA public TO mcp_admin;

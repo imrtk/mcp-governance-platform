@@ -49,6 +49,7 @@ def _get_conn(admin=False):
 def _init_schema():
     """Create tables if they don't exist."""
     if not PGSQL_HOST:
+        print("[pgsql-mcp] PGSQL_HOST not set, skipping schema init")
         return
     try:
         conn = _get_conn(admin=True)
@@ -89,9 +90,11 @@ def _init_schema():
                 labels JSONB
             )
         """)
+        cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO mcp_user")
         cur.close()
-    except Exception:
-        pass
+        print("[pgsql-mcp] Schema init OK")
+    except Exception as e:
+        print(f"[pgsql-mcp] Schema init error: {e}")
 
 
 TOOLS = [
