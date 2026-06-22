@@ -99,10 +99,10 @@ def _vm_summary(vm):
         power = summary.runtime.powerState
         cpu = summary.config.numCpu or 0
         ram_mb = summary.config.memorySizeMB or 0
-        ip = summary.guest.ipAddress if summary.guest else "N/A"
+        ip = str(summary.guest.ipAddress) if summary.guest and summary.guest.ipAddress else "N/A"
         return {
             "name": vm.name,
-            "power_state": str(power),
+            "power_state": str(power) if power else "unknown",
             "cpu": cpu,
             "ram_mb": ram_mb,
             "os": guest,
@@ -234,7 +234,10 @@ def _list_vms(args: dict) -> str:
     lines = []
     for vm in sorted(vms, key=lambda v: v.name.lower()):
         s = _vm_summary(vm)
-        lines.append(f"  {s['name']:25s} {s['power_state']:12s} {s['cpu']}cpu {s['ram_mb']}MB {s['ip']:15s} {s['os'][:40]}")
+        if "error" in s:
+            lines.append(f"  {s['name']:25s} ERROR: {s['error']}")
+        else:
+            lines.append(f"  {s['name']:25s} {s['power_state']:12s} {s['cpu']}cpu {s['ram_mb']}MB {s['ip']:15s} {s['os'][:40]}")
     return f"VMs ({len(vms)}):\n" + "\n".join(lines)
 
 
