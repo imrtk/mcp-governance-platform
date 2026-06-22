@@ -44,6 +44,14 @@ info "monitor-agent baslatiliyor (8014)..."
 uv run python -m agents.monitor_agent &
 sleep 1
 
+info "pgsql-mcp baslatiliyor (8020)..."
+uv run uvicorn mcp_servers.pgsql_mcp:app --host 0.0.0.0 --port 8020 &
+sleep 1
+
+info "pgsql-agent baslatiliyor (8021)..."
+uv run python -m agents.pgsql_agent &
+sleep 1
+
 # ── Governance platformu ──
 info "Governance platformu baslatiliyor (8080)..."
 uv run python main.py

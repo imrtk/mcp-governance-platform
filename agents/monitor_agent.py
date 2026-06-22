@@ -13,6 +13,8 @@ _alert_history: list[dict] = []
 _alert_lock = threading.Lock()
 _last_status = ""
 
+PGSQL_AGENT_URL = os.getenv("PGSQL_AGENT_URL", "http://localhost:8021")
+
 
 def _get_agent():
     global _agent_instance
@@ -32,6 +34,21 @@ def _call_vcenter_agent(tool: str, params: dict) -> str:
         return "\n".join(c.get("text", "") for c in contents)
     except Exception as e:
         return f"[ERROR] {e}"
+
+
+def _call_pgsql_agent(tool: str, params: dict) -> str:
+    try:
+        resp = httpx.post(
+            f"{GATEWAY_URL}/api/gateway/agent/pgsql-agent/ask",
+            json={"agent_id": "monitor-agent", "tool_name": tool, "params": params},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        contents = data.get("result", {}).get("content", [])
+        return "\n".join(c.get("text", "") for c in contents)
+    except Exception as e:
+        return f"[PGSQL-AGENT ERROR] {e}"
 
 
 def _call_orchestrator(task: str) -> str:
@@ -76,6 +93,15 @@ def _check_vcenter_vms() -> list[dict]:
                         "action": "orchestrator",
                         "result": fix_result[:120],
                     })
+                _call_pgsql_agent("pgsql_insert_alert", {
+                    "source": "monitor-agent",
+                    "level": "warn",
+                    "host": vm_name,
+                    "service": "vm",
+                    "message": f"VM {vm_name} powered off, auto-fix triggered",
+                    "action": "orchestrator",
+                    "result": fix_result[:200],
+                })
                 print(f"[monitor-agent] ORCHESTRATOR {vm_name}: {fix_result[:60]}")
             else:
                 result["fixed"] = False

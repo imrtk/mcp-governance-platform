@@ -53,6 +53,24 @@ _server_registry: dict[str, dict] = {
         "platform": "local",
         "capabilities": [],
     },
+    "pgsql-mcp": {
+        "id": 5,
+        "name": "pgsql-mcp",
+        "description": "PostgreSQL database MCP: queries, alert logging, schema inspection",
+        "url": os.getenv("PGSQL_MCP_URL", "http://localhost:8020"),
+        "status": "running",
+        "platform": "local",
+        "capabilities": [],
+    },
+    "pgsql-agent": {
+        "id": 6,
+        "name": "pgsql-agent",
+        "description": "PostgreSQL agent: database queries, alert management, schema inspection",
+        "url": os.getenv("PGSQL_AGENT_URL", "http://localhost:8021"),
+        "status": "running",
+        "platform": "local",
+        "capabilities": [],
+    },
 }
 
 

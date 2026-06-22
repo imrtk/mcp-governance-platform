@@ -56,6 +56,7 @@ Rules:
 Available agents:
 - vcenter-agent: VM management (list, power, deploy, snapshots, resources)
 - monitor-agent: vCenter VM monitoring (check_vms, status)
+- pgsql-agent: PostgreSQL database queries, alert logging, schema inspection (pgsql_query, pgsql_insert_alert, pgsql_get_alerts, pgsql_list_tables, pgsql_describe_table)
 
 vcenter-agent tools:
 - To list all VMs → use: vcenter-agent vcenter_list_vms
@@ -89,6 +90,15 @@ TOOL: monitor-agent check_vms {{}}
 
 User: what is the monitor status
 TOOL: monitor-agent status {{}}
+
+User: show recent database alerts
+TOOL: pgsql-agent pgsql_get_alerts {{"limit": "10", "level": "error"}}
+
+User: log an alert that VM zeus was powered on
+TOOL: pgsql-agent pgsql_insert_alert {{"source": "orchestrator", "level": "info", "host": "zeus", "service": "vm", "message": "VM powered on", "action": "power_on", "result": "success"}}
+
+User: list database tables
+TOOL: pgsql-agent pgsql_list_tables {{}}
 """
 
 
