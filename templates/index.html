@@ -437,7 +437,7 @@
         }
 
         async function agentPing(name) {
-            try { const r = await fetch(`/api/gateway/agent/${name}/ask`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tool_name:'list_hosts',params:{}})}); alert(await r.text()); } catch(e) { alert('Hata: '+e.message); }
+            try { const r = await fetch(`/api/gateway/agent/${name}/ask`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tool_name:'vcenter_list_hosts',params:{}})}); const d = await r.json(); alert(JSON.stringify(d, null, 2)); } catch(e) { alert('Hata: '+e.message); }
         }
 
         async function agentCall(name) {
