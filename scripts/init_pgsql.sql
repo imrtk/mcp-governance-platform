@@ -1,5 +1,8 @@
 -- PostgreSQL ilk kurulum: database + user + yetkiler
--- psql -U postgres -f scripts/init_pgsql.sql
+-- KULLANIM: psql -U postgres -f scripts/init_pgsql.sql
+-- NOT: DB/users zaten varsa hata verir, sorunsuz devam etmek icin
+--       once su komutu calistir:
+--       psql -U postgres -d mcp_platform -f scripts/grant_schema.sql
 
 CREATE DATABASE mcp_platform;
 
@@ -9,9 +12,3 @@ GRANT CONNECT ON DATABASE mcp_platform TO mcp_user;
 CREATE USER mcp_admin WITH PASSWORD 'admin_pass';
 GRANT CONNECT ON DATABASE mcp_platform TO mcp_admin;
 GRANT ALL PRIVILEGES ON DATABASE mcp_platform TO mcp_admin;
-
--- PostgreSQL 15+: public schema'da CREATE yetkisi kalkti, acikca verilmeli
-\c mcp_platform
-GRANT USAGE ON SCHEMA public TO mcp_user;
-GRANT USAGE ON SCHEMA public TO mcp_admin;
-GRANT CREATE ON SCHEMA public TO mcp_admin;
