@@ -59,3 +59,5 @@ uv run python -m agents.pgsql_agent &
 sleep 1
 
 echo ""
+info "Tüm servisler ayakta. CTRL+C ile durdurun."
+wait
