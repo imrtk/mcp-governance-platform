@@ -117,6 +117,7 @@
             <div class="tab" onclick="switchTab('servers')">MCP Servers</div>
             <div class="tab" onclick="switchTab('agents')">Agent'lar</div>
             <div class="tab" onclick="switchTab('test')">Test</div>
+            <div class="tab" onclick="switchTab('mcp-test')">MCP Test</div>
             <div class="tab" onclick="switchTab('audit')">Audit Log</div>
             <div class="tab" onclick="switchTab('orch')">Orchestrator</div>
             <div class="tab" onclick="switchTab('chat')">Agent Konuşmaları</div>
@@ -234,6 +235,43 @@
                 </div>
                 <button class="btn-add" style="margin-top:12px" onclick="testPolicy()">Test Et</button>
                 <pre id="test-result" style="margin-top:12px;display:none"></pre>
+            </div>
+        </div>
+
+        <div id="tab-mcp-test" class="tab-content">
+            <div class="card full">
+                <h2>MCP Tool Test</h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div>
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Sunucu / Agent</label>
+                        <select id="mcp-test-server" style="width:100%;padding:8px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text)" onchange="mcpTestServerChange()">
+                            <option value="">— Seçin —</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Tool</label>
+                        <select id="mcp-test-tool" style="width:100%;padding:8px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text)" onchange="mcpTestToolChange()">
+                            <option value="">— Seçin —</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Tool Açıklaması</label>
+                        <input id="mcp-test-tool-desc" readonly style="width:100%;padding:8px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text-secondary);font-size:12px">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Input Schema</label>
+                        <div id="mcp-test-schema" style="font-size:11px;color:var(--text-secondary);padding:4px 0">Tool seçin</div>
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Argümanlar (JSON)</label>
+                        <textarea id="mcp-test-args" rows="4" style="width:100%;padding:8px;border:1px solid var(--input-border);border-radius:6px;font-family:monospace;font-size:13px;background:var(--input-bg);color:var(--text)">{}</textarea>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px">
+                    <button class="btn-add" onclick="mcpTestRun()">▶ Çalıştır</button>
+                    <button class="btn-save" onclick="mcpTestLoadTools()">🔄 Tool'ları Yenile</button>
+                </div>
+                <pre id="mcp-test-result" style="margin-top:12px;display:none;max-height:500px;overflow-y:auto"></pre>
             </div>
         </div>
 
@@ -536,6 +574,118 @@
             } catch (e) { result.textContent = `Hata: ${e.message}`; }
         }
 
+        let mcpTestToolsCache = {};
+
+        async function mcpTestLoadTools() {
+            const sel = document.getElementById('mcp-test-server');
+            const servers = await api('/api/registry/servers');
+            const prev = sel.value;
+            sel.innerHTML = '<option value="">— Seçin —</option>';
+            servers.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = `${s.name} (${s.url || '?'}) [${s.capabilities.length} tool]`;
+                sel.appendChild(opt);
+            });
+            if (prev) sel.value = prev;
+
+            mcpTestToolsCache = {};
+            for (const s of servers) {
+                const tools = await mcpTestFetchTools(s.name);
+                if (tools.length) mcpTestToolsCache[s.name] = tools;
+            }
+            mcpTestServerChange();
+        }
+
+        async function mcpTestFetchTools(serverName) {
+            try {
+                const r = await fetch('/api/gateway/mcp-test', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({server_name: serverName, method: 'tools/list'})
+                });
+                const data = await r.json();
+                return data?.result?.tools || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function mcpTestServerChange() {
+            const server = document.getElementById('mcp-test-server').value;
+            const toolSel = document.getElementById('mcp-test-tool');
+            toolSel.innerHTML = '<option value="">— Seçin —</option>';
+            document.getElementById('mcp-test-tool-desc').value = '';
+            document.getElementById('mcp-test-schema').textContent = 'Tool seçin';
+
+            if (!server) return;
+
+            const tools = mcpTestToolsCache[server] || [];
+            tools.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.name;
+                opt.textContent = t.name;
+                toolSel.appendChild(opt);
+            });
+        }
+
+        function mcpTestToolChange() {
+            const server = document.getElementById('mcp-test-server').value;
+            const toolName = document.getElementById('mcp-test-tool').value;
+            const desc = document.getElementById('mcp-test-tool-desc');
+            const schema = document.getElementById('mcp-test-schema');
+
+            if (!server || !toolName) {
+                desc.value = '';
+                schema.textContent = 'Tool seçin';
+                return;
+            }
+
+            const tools = mcpTestToolsCache[server] || [];
+            const tool = tools.find(t => t.name === toolName);
+            if (tool) {
+                desc.value = tool.description || '';
+                schema.textContent = JSON.stringify(tool.inputSchema || {}, null, 2);
+
+                const defaultArgs = {};
+                for (const [key, prop] of Object.entries(tool.inputSchema?.properties || {})) {
+                    if (prop.default !== undefined) defaultArgs[key] = prop.default;
+                    else if (prop.type === 'boolean') defaultArgs[key] = false;
+                    else if (prop.type === 'integer' || prop.type === 'number') defaultArgs[key] = 0;
+                    else if (prop.type === 'array') defaultArgs[key] = [];
+                    else if (prop.type === 'object') defaultArgs[key] = {};
+                    else defaultArgs[key] = '';
+                }
+                document.getElementById('mcp-test-args').value = JSON.stringify(defaultArgs, null, 2);
+            }
+        }
+
+        async function mcpTestRun() {
+            const result = document.getElementById('mcp-test-result');
+            result.style.display = 'block';
+            result.textContent = '⏳ Çalıştırılıyor...';
+
+            const server = document.getElementById('mcp-test-server').value;
+            const tool = document.getElementById('mcp-test-tool').value;
+            let args = {};
+            try {
+                args = JSON.parse(document.getElementById('mcp-test-args').value || '{}');
+            } catch (e) {
+                result.innerHTML = `<span style="color:#ef4444">JSON hatası: ${escHtml(e.message)}</span>`;
+                return;
+            }
+
+            try {
+                const data = await api('/api/gateway/mcp-test', {
+                    method: 'POST',
+                    body: JSON.stringify({server_name: server, method: 'tools/call', tool_name: tool, arguments: args})
+                });
+                result.innerHTML = `<pre style="background:var(--pre-bg);color:var(--pre-text);padding:16px;border-radius:8px;overflow-x:auto;font-size:13px;max-height:450px;overflow-y:auto">${escHtml(JSON.stringify(data, null, 2))}</pre>`;
+            } catch (e) {
+                result.innerHTML = `<span style="color:#ef4444">Hata: ${escHtml(e.message)}</span>`;
+            }
+        }
+
         async function sendOrchestratorTask() {
             const input = document.getElementById('orchestrator-task');
             const result = document.getElementById('orchestrator-result');
@@ -667,6 +817,7 @@
             if (name === 'servers') loadServers();
             if (name === 'agents') loadAgents();
             if (name === 'audit') loadAudit();
+            if (name === 'mcp-test') mcpTestLoadTools();
             if (name === 'orch') loadOrchHistory();
             if (name === 'chat') loadChat();
         }
