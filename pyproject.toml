@@ -13,6 +13,7 @@ dependencies = [
     "mcp[cli]>=1.28.0",
     "pyvmomi",
     "python-dotenv",
+    "psycopg2-binary",
 ]
 
 [project.scripts]
