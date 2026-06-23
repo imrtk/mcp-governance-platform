@@ -20,6 +20,7 @@ fi
 cleanup() {
     info "Servisler durduruluyor..."
     pkill -f "uvicorn.*vcenter_mcp" 2>/dev/null || true
+    pkill -f "uvicorn.*pgsql_mcp" 2>/dev/null || true
     pkill -f "agents\." 2>/dev/null || true
     pkill -f "main.py" 2>/dev/null || true
     sleep 1
