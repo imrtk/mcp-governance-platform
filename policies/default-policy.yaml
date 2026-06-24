@@ -3,7 +3,7 @@ defaultAction: deny
 name: platform-default-policy
 rules:
 - action: allow
-  condition: tool_name in ["vcenter_list_vms", "vcenter_vm_status", "vcenter_power_on", "vcenter_power_off", "vcenter_reset_vm", "vcenter_ensure_running", "vcenter_vm_info", "vcenter_cluster_resources", "vcenter_list_datastores", "vcenter_list_hosts", "vcenter_create_snapshot", "vcenter_deploy_vm", "vcenter_datastore_usage", "vcenter_vm_summary"]
+  condition: tool_name in ["vcenter_list_vms", "vcenter_vm_status", "vcenter_power_on", "vcenter_power_off", "vcenter_reset_vm", "vcenter_ensure_running", "vcenter_vm_info", "vcenter_cluster_resources", "vcenter_list_datastores", "vcenter_list_hosts", "vcenter_create_snapshot", "vcenter_deploy_vm", "vcenter_datastore_usage", "vcenter_vm_summary", "vcenter_vm_has_tag", "vcenter_list_events", "vcenter_list_alarms", "vcenter_metric_history"]
   message: vCenter VM management tools
   name: allow-vcenter
 - action: allow
@@ -11,7 +11,7 @@ rules:
   message: Orchestrator ask tool
   name: allow-orchestrator
 - action: allow
-  condition: tool_name in ["check_vms", "status"]
+  condition: tool_name in ["check_vms", "check_resources", "check_events", "status"]
   message: Monitor agent tools
   name: allow-monitor
 - action: allow

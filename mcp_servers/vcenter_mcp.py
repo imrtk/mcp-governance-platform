@@ -1,4 +1,5 @@
 import os, json, ssl, time, re, httpx
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI
@@ -234,6 +235,43 @@ TOOLS = [
                 "tag_name": {"type": "string", "description": "Tag name to check"},
             },
             "required": ["name", "tag_name"],
+        },
+    },
+    {
+        "name": "vcenter_list_events",
+        "description": "Query recent vCenter events (VM create, power, errors, etc.)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "max_count": {"type": "integer", "description": "Max events to return", "default": 50},
+                "recent_minutes": {"type": "integer", "description": "Only events in last N minutes", "default": 60},
+                "event_type": {"type": "string", "description": "Filter by event type keyword (e.g. error, power, vm.created)", "default": ""},
+                "entity_name": {"type": "string", "description": "Filter by VM/host name", "default": ""},
+            },
+        },
+    },
+    {
+        "name": "vcenter_list_alarms",
+        "description": "List triggered vCenter alarms (red/yellow status) for all entities",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "severity": {"type": "string", "description": "Filter: red, yellow, green", "default": ""},
+                "entity_name": {"type": "string", "description": "Filter by entity name", "default": ""},
+            },
+        },
+    },
+    {
+        "name": "vcenter_metric_history",
+        "description": "Get historical performance metrics for a VM or host (CPU, RAM, disk I/O)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "entity_name": {"type": "string", "description": "VM or host name"},
+                "metric": {"type": "string", "description": "Metric name: cpu.usage.average, mem.usage.average, disk.usage.average", "default": "cpu.usage.average"},
+                "range_minutes": {"type": "integer", "description": "Lookback window in minutes", "default": 30},
+            },
+            "required": ["entity_name"],
         },
     },
 ]
@@ -657,6 +695,157 @@ def _wait_task(task, timeout=300):
         time.sleep(2)
 
 
+def _list_events(args: dict) -> str:
+    from pyVmomi import vim
+    max_count = min(args.get("max_count", 50), 500)
+    recent_minutes = args.get("recent_minutes", 60)
+    event_type_filter = args.get("event_type", "").lower()
+    entity_name_filter = args.get("entity_name", "").lower()
+    content = _get_content()
+    em = content.eventManager
+    if not em:
+        return "EventManager not available"
+    spec = vim.event.EventFilterSpec()
+    spec.maxCount = max_count
+    spec.time = vim.event.EventFilterSpec.ByTime(
+        beginTime=datetime.now() - timedelta(minutes=recent_minutes),
+        endTime=datetime.now(),
+    )
+    if entity_name_filter:
+        dc = _get_datacenter(content)
+        if dc:
+            for vm in _walk_vms(dc):
+                if vm.name.lower() == entity_name_filter:
+                    spec.entity = vim.event.EventFilterSpec.ByEntity(entity=vm, recursion="self")
+                    break
+    try:
+        events = em.QueryEvent(spec)
+    except Exception:
+        try:
+            events = em.QueryEvents(spec)
+        except Exception as e:
+            return json.dumps({"error": f"QueryEvents failed: {e}"})
+    results = []
+    for ev in events[:max_count]:
+        msg = getattr(ev, 'fullFormattedMessage', '') or getattr(ev, 'eventTypeId', '') or str(ev)
+        etype = getattr(ev, 'eventTypeId', type(ev).__name__)
+        severity = getattr(ev, 'severity', 'info')
+        if event_type_filter and event_type_filter not in etype.lower() and event_type_filter not in msg.lower():
+            continue
+        creator = ""
+        if hasattr(ev, 'userName'):
+            creator = ev.userName
+        elif hasattr(ev, 'user') and ev.user:
+            creator = getattr(ev.user, 'name', '')
+        if hasattr(ev, 'vm') and ev.vm:
+            vm_name = ev.vm.name
+        else:
+            vm_name = entity_name_filter or ""
+        results.append({
+            "time": str(ev.createdTime)[:19] if hasattr(ev, 'createdTime') and ev.createdTime else "",
+            "type": etype,
+            "severity": str(severity),
+            "user": creator,
+            "vm": vm_name,
+            "message": msg[:200],
+        })
+    return json.dumps({"event_count": len(results), "events": results}, indent=2)
+
+
+def _list_alarms(args: dict) -> str:
+    severity_filter = args.get("severity", "").lower()
+    entity_filter = args.get("entity_name", "").lower()
+    content = _get_content()
+    alarm_manager = content.alarmManager
+    if not alarm_manager:
+        return json.dumps({"error": "AlarmManager not available"})
+    results = []
+    dc = _get_datacenter(content)
+    if not dc:
+        return "No datacenter found"
+    all_vms = _walk_vms(dc)
+    for vm in all_vms:
+        if entity_filter and entity_filter not in vm.name.lower():
+            continue
+        try:
+            states = alarm_manager.GetAlarmState(vm)
+            for state in states:
+                status = str(state.overallStatus) if state.overallStatus else "unknown"
+                if severity_filter and severity_filter not in status.lower():
+                    continue
+                alarm_name = ""
+                try:
+                    alarm_name = alarm_manager.GetAlarm(vm).name if alarm_manager.GetAlarm(vm) else ""
+                except Exception:
+                    alarm_name = str(state.alarm) if state.alarm else ""
+                results.append({
+                    "vm": vm.name,
+                    "alarm": alarm_name,
+                    "status": status,
+                    "time": str(state.time)[:19] if hasattr(state, 'time') and state.time else "",
+                    "key": state.key if hasattr(state, 'key') else "",
+                })
+        except Exception:
+            pass
+    return json.dumps({"alarm_count": len(results), "alarms": results}, indent=2)
+
+
+def _metric_history(args: dict) -> str:
+    entity_name = args.get("entity_name", "")
+    metric_name = args.get("metric", "cpu.usage.average")
+    range_minutes = args.get("range_minutes", 30)
+    if not entity_name:
+        return "entity_name required"
+    content = _get_content()
+    pm = content.perfManager
+    if not pm:
+        return json.dumps({"error": "PerfManager not available"})
+    dc = _get_datacenter(content)
+    if not dc:
+        return "No datacenter found"
+    entity = None
+    for vm in _walk_vms(dc):
+        if vm.name.lower() == entity_name.lower():
+            entity = vm
+            break
+    if not entity:
+        for folder in dc.hostFolder.childEntity:
+            if hasattr(folder, 'childEntity'):
+                for c in folder.childEntity:
+                    if hasattr(c, 'host'):
+                        for h in c.host:
+                            if h.name.lower() == entity_name.lower():
+                                entity = h
+                                break
+    if not entity:
+        return json.dumps({"error": f"Entity '{entity_name}' not found"})
+    counter_id = None
+    for counter in pm.perfCounter:
+        ci = counter.groupInfo.key + "." + counter.nameInfo.key + "." + str(counter.rollupType)[0].lower()
+        if ci == metric_name:
+            counter_id = counter.key
+            break
+    if not counter_id:
+        return json.dumps({"error": f"Metric '{metric_name}' not found", "available_counters": len(pm.perfCounter)})
+    from pyVmomi import vim
+    spec = vim.PerformanceManager.QuerySpec(
+        maxSample=10,
+        entity=entity,
+        metricId=[vim.PerformanceManager.MetricId(counterId=counter_id, instance="")],
+        startTime=datetime.now() - timedelta(minutes=range_minutes),
+        endTime=datetime.now(),
+    )
+    try:
+        stats = pm.QueryStats([spec])
+        values = []
+        for stat in stats:
+            for v in stat.value:
+                values.append({"time": str(stat.sampleInfo[-1].timestamp)[:19] if stat.sampleInfo else "", "value": v.value})
+        return json.dumps({"entity": entity_name, "metric": metric_name, "samples": len(values), "values": values}, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
 TOOL_FUNCS = {
     "vcenter_list_vms": _list_vms,
     "vcenter_vm_status": _vm_status,
@@ -670,6 +859,9 @@ TOOL_FUNCS = {
     "vcenter_create_snapshot": _create_snapshot,
     "vcenter_deploy_vm": _deploy_from_template,
     "vcenter_vm_has_tag": _vm_has_tag_tool,
+    "vcenter_list_events": _list_events,
+    "vcenter_list_alarms": _list_alarms,
+    "vcenter_metric_history": _metric_history,
 }
 
 app = FastAPI(title="vcenter-mcp")

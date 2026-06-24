@@ -90,7 +90,7 @@ def _init_schema():
                 labels JSONB
             )
         """)
-        cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO mcp_user")
+        cur.execute("GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA public TO mcp_user")
         cur.close()
         print("[pgsql-mcp] Schema init OK")
     except Exception as e:

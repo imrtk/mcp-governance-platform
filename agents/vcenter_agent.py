@@ -140,6 +140,43 @@ TOOLS = [
             "required": ["name", "tag_name"],
         },
     },
+    {
+        "name": "vcenter_list_events",
+        "description": "Query recent vCenter events (VM create, power, errors, etc.)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "max_count": {"type": "integer", "description": "Max events", "default": 50},
+                "recent_minutes": {"type": "integer", "description": "Last N minutes", "default": 60},
+                "event_type": {"type": "string", "description": "Filter keyword (error, power, etc.)", "default": ""},
+                "entity_name": {"type": "string", "description": "Filter by VM name", "default": ""},
+            },
+        },
+    },
+    {
+        "name": "vcenter_list_alarms",
+        "description": "List triggered vCenter alarms (red/yellow status)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "severity": {"type": "string", "description": "Filter: red, yellow, green", "default": ""},
+                "entity_name": {"type": "string", "description": "Filter by VM name", "default": ""},
+            },
+        },
+    },
+    {
+        "name": "vcenter_metric_history",
+        "description": "Get historical performance metrics (CPU, RAM, disk) for a VM or host",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "entity_name": {"type": "string", "description": "VM or host name"},
+                "metric": {"type": "string", "description": "cpu.usage.average, mem.usage.average, disk.usage.average", "default": "cpu.usage.average"},
+                "range_minutes": {"type": "integer", "description": "Lookback minutes", "default": 30},
+            },
+            "required": ["entity_name"],
+        },
+    },
 ]
 
 _agent_instance = None
@@ -242,6 +279,30 @@ def _vm_has_tag(args: dict) -> str:
     return _call("vcenter_vm_has_tag", {"name": name, "tag_name": tag_name})
 
 
+def _list_events(args: dict) -> str:
+    return _call("vcenter_list_events", {
+        "max_count": args.get("max_count", 50),
+        "recent_minutes": args.get("recent_minutes", 60),
+        "event_type": args.get("event_type", ""),
+        "entity_name": args.get("entity_name", ""),
+    })
+
+
+def _list_alarms(args: dict) -> str:
+    return _call("vcenter_list_alarms", {
+        "severity": args.get("severity", ""),
+        "entity_name": args.get("entity_name", ""),
+    })
+
+
+def _metric_history(args: dict) -> str:
+    return _call("vcenter_metric_history", {
+        "entity_name": args.get("entity_name", ""),
+        "metric": args.get("metric", "cpu.usage.average"),
+        "range_minutes": args.get("range_minutes", 30),
+    })
+
+
 TOOL_FUNCS = {
     "vcenter_list_vms": _list_vms,
     "vcenter_vm_status": _vm_status,
@@ -257,6 +318,9 @@ TOOL_FUNCS = {
     "vcenter_deploy_vm": _deploy_vm,
     "vcenter_vm_summary": _vm_summary,
     "vcenter_vm_has_tag": _vm_has_tag,
+    "vcenter_list_events": _list_events,
+    "vcenter_list_alarms": _list_alarms,
+    "vcenter_metric_history": _metric_history,
 }
 
 if __name__ == "__main__":

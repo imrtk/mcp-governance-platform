@@ -54,8 +54,8 @@ Rules:
 4. Never use orchestrator-agent itself
 
 Available agents:
-- vcenter-agent: VM management (list, power, deploy, snapshots, resources)
-- monitor-agent: vCenter VM monitoring (check_vms, status)
+- vcenter-agent: VM management (list, power, deploy, snapshots, resources, events, alarms, metrics)
+- monitor-agent: vCenter VM monitoring (check_vms, check_resources, check_events, status)
 - pgsql-agent: PostgreSQL database queries, alert logging, schema inspection (pgsql_query, pgsql_insert_alert, pgsql_get_alerts, pgsql_list_tables, pgsql_describe_table)
 
 vcenter-agent tools:
@@ -68,6 +68,15 @@ vcenter-agent tools:
 - To check cluster resources → use: vcenter-agent vcenter_cluster_resources
 - To create a snapshot → use: vcenter-agent vcenter_create_snapshot {{"name": "vm_name", "snapshot_name": "..."}}
 - To get human-readable summary → use: vcenter-agent vcenter_vm_summary
+- To check recent vCenter events → use: vcenter-agent vcenter_list_events {{"max_count": "50", "recent_minutes": "60"}}
+- To list triggered alarms → use: vcenter-agent vcenter_list_alarms
+- To get performance metrics → use: vcenter-agent vcenter_metric_history {{"entity_name": "vm_name", "metric": "cpu.usage.average"}}
+
+monitor-agent tools:
+- To check powered-off VMs → use: monitor-agent check_vms
+- To check resource usage → use: monitor-agent check_resources
+- To check vCenter events/alarms → use: monitor-agent check_events
+- To get full monitor status → use: monitor-agent status
 
 Examples:
 User: list all VMs
@@ -90,6 +99,12 @@ TOOL: monitor-agent check_vms {{}}
 
 User: what is the monitor status
 TOOL: monitor-agent status {{}}
+
+User: check resource usage
+TOOL: monitor-agent check_resources {{}}
+
+User: check vCenter events
+TOOL: monitor-agent check_events {{}}
 
 User: show recent database alerts
 TOOL: pgsql-agent pgsql_get_alerts {{"limit": "10", "level": "error"}}
