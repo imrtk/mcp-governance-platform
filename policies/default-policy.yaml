@@ -19,7 +19,7 @@ rules:
   message: PostgreSQL database tools
   name: allow-pgsql
 - action: allow
-  condition: tool_name in ["zabbix_list_hosts", "zabbix_get_host", "zabbix_list_alerts", "zabbix_get_metrics", "zabbix_get_events", "zabbix_create_host", "zabbix_delete_host", "zabbix_acknowledge_event", "zabbix_list_templates", "zabbix_list_groups", "zabbix_get_dashboard"]
+  condition: tool_name in ["zabbix_list_hosts", "zabbix_get_host", "zabbix_list_alerts", "zabbix_get_metrics", "zabbix_get_events", "zabbix_create_host", "zabbix_acknowledge_event", "zabbix_list_templates", "zabbix_list_groups", "zabbix_get_dashboard"]
   message: Zabbix monitoring tools
   name: allow-zabbix
 - action: deny
@@ -30,6 +30,10 @@ rules:
     "sudo reboot" or params contains "||" or params contains "&&"
   message: Destructive action blocked by central policy
   name: block-destructive-actions
+- action: deny
+  condition: tool_name in ["zabbix_delete_host"]
+  message: Host deletion is blocked by central policy
+  name: block-zabbix-delete
 - action: log
   condition: true
   name: audit-all-calls
