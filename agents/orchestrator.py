@@ -55,7 +55,7 @@ Rules:
 
 Available agents:
 - vcenter-agent: VM management (list, power, deploy, snapshots, resources, events, alarms, metrics)
-- monitor-agent: vCenter VM monitoring (check_vms, check_resources, check_events, status)
+- monitor-agent: vCenter VM + kaynak + event monitoring + Zabbix alert takibi (check_vms, check_resources, check_events, check_zabbix, status)
 - pgsql-agent: PostgreSQL database queries, alert logging, schema inspection (pgsql_query, pgsql_insert_alert, pgsql_get_alerts, pgsql_list_tables, pgsql_describe_table)
 - zabbix-agent: Zabbix monitoring management (hosts, alerts, metrics, events)
 
@@ -106,6 +106,9 @@ TOOL: monitor-agent check_resources {{}}
 
 User: check vCenter events
 TOOL: monitor-agent check_events {{}}
+
+User: check Zabbix alerts
+TOOL: monitor-agent check_zabbix {{}}
 
 User: show recent database alerts
 TOOL: pgsql-agent pgsql_get_alerts {{"limit": "10", "level": "error"}}

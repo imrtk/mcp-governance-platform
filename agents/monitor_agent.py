@@ -8,6 +8,7 @@ GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8080")
 MONITOR_INTERVAL = int(os.getenv("MONITOR_INTERVAL", "60"))
 RESOURCE_MONITOR_INTERVAL = int(os.getenv("RESOURCE_MONITOR_INTERVAL", "120"))
 EVENT_MONITOR_INTERVAL = int(os.getenv("EVENT_MONITOR_INTERVAL", "300"))
+ZABBIX_MONITOR_INTERVAL = int(os.getenv("ZABBIX_MONITOR_INTERVAL", "300"))
 MONITOR_IGNORE_TAG = os.getenv("MONITOR_IGNORE_TAG", "monitor-ignore")
 RESOURCE_CPU_THRESHOLD = float(os.getenv("RESOURCE_CPU_THRESHOLD", "85"))
 RESOURCE_RAM_THRESHOLD = float(os.getenv("RESOURCE_RAM_THRESHOLD", "90"))
@@ -19,6 +20,7 @@ _alert_lock = threading.Lock()
 _last_status = ""
 _last_resource_status = ""
 _last_event_status = ""
+_last_zabbix_status = ""
 
 PGSQL_AGENT_URL = os.getenv("PGSQL_AGENT_URL", "http://localhost:8021")
 
@@ -94,6 +96,21 @@ def _call_vcenter(tool: str, params: dict) -> str:
         return "\n".join(c.get("text", "") for c in contents)
     except Exception as e:
         return f"[VCENTER ERROR] {e}"
+
+
+def _call_zabbix(tool: str, params: dict) -> str:
+    try:
+        resp = httpx.post(
+            f"{GATEWAY_URL}/api/gateway/agent/zabbix-agent/ask",
+            json={"agent_id": "monitor-agent", "tool_name": tool, "params": params},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        contents = data.get("result", {}).get("content", [])
+        return "\n".join(c.get("text", "") for c in contents)
+    except Exception as e:
+        return f"[ZABBIX ERROR] {e}"
 
 
 def _check_resource_usage() -> str:
@@ -194,6 +211,50 @@ def _check_events_and_alarms() -> str:
     return "[EVENTS/ALARMS] No errors or triggered alarms in last 30 min"
 
 
+def _check_zabbix_alerts() -> str:
+    alerts_raw = _call_zabbix("zabbix_list_alerts", {"limit": 50})
+    events_raw = _call_zabbix("zabbix_get_events", {"limit": 20, "severity": "average"})
+    dashboard_raw = _call_zabbix("zabbix_get_dashboard", {})
+    alerts = []
+    try:
+        if "Active triggers" in alerts_raw:
+            for line in alerts_raw.strip().split("\n"):
+                line = line.strip()
+                if not line or line.startswith("Active triggers"):
+                    continue
+                sev_map = {"NC": "info", "INFO": "info", "WARN": "warn", "AVG": "warn", "HIGH": "error", "DIS": "error"}
+                sev_tag = line[2:5].strip() if len(line) > 5 else ""
+                level = sev_map.get(sev_tag, "warn")
+                desc = line[7:67].strip() if len(line) > 67 else line[7:].strip()
+                host_part = line[68:88].strip() if len(line) > 88 else ""
+                _log_alert("monitor-agent", level, host_part or "zabbix", "trigger", desc[:200], action="auto-log")
+                alerts.append(f"[{sev_tag}] {host_part}: {desc[:80]}")
+    except Exception as e:
+        alerts.append(f"[ZABBIX PARSE ERROR] {e}")
+    try:
+        ev_data = json.loads(events_raw)
+        for ev in ev_data.get("events", [])[:10]:
+            name = ev.get("name", "")
+            sev = int(ev.get("severity", 0))
+            if sev >= 3:
+                level = "error" if sev >= 4 else "warn"
+                _log_alert("monitor-agent", level, "zabbix", "event", name[:200], action="auto-log")
+                alerts.append(f"[EVENT] {name[:100]}")
+    except Exception:
+        pass
+    try:
+        dash = json.loads(dashboard_raw)
+        problems = dash.get("active_problems", 0)
+        events_24h = dash.get("events_last_24h", 0)
+        _insert_metric("monitor-agent", "zabbix.active_problems", problems)
+        _insert_metric("monitor-agent", "zabbix.events_24h", events_24h)
+    except Exception:
+        pass
+    if alerts:
+        return "[ZABBIX ALERTS]\n" + "\n".join(alerts[:20])
+    return "[ZABBIX] No active problems"
+
+
 def _call_orchestrator(task: str) -> str:
     try:
         resp = httpx.post(
@@ -292,6 +353,11 @@ TOOLS = [
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
+        "name": "check_zabbix",
+        "description": "Check Zabbix alerts/events/dashboard, log problems to database",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "status",
         "description": "Get latest monitoring status and alert history",
         "inputSchema": {"type": "object", "properties": {}},
@@ -317,6 +383,12 @@ def _check_events(args: dict) -> str:
     return _last_event_status
 
 
+def _check_zabbix(args: dict) -> str:
+    global _last_zabbix_status
+    _last_zabbix_status = _check_zabbix_alerts()
+    return _last_zabbix_status
+
+
 def _status(args: dict) -> str:
     global _last_status
     if not _last_status:
@@ -326,6 +398,8 @@ def _status(args: dict) -> str:
         parts.append(f"\n=== Resource Monitoring ===\n{_last_resource_status}")
     if _last_event_status:
         parts.append(f"\n=== Event/Alarm Monitoring ===\n{_last_event_status}")
+    if _last_zabbix_status:
+        parts.append(f"\n=== Zabbix Monitoring ===\n{_last_zabbix_status}")
     with _alert_lock:
         if _alert_history:
             parts.append(f"\n=== Alert History ({len(_alert_history)} total) ===")
@@ -339,14 +413,16 @@ TOOL_FUNCS = {
     "check_vms": _check_vms,
     "check_resources": _check_resources,
     "check_events": _check_events,
+    "check_zabbix": _check_zabbix,
     "status": _status,
 }
 
 
 def _background_monitor():
-    global _last_status, _last_resource_status, _last_event_status
+    global _last_status, _last_resource_status, _last_event_status, _last_zabbix_status
     resource_counter = 0
     event_counter = 0
+    zabbix_counter = 0
     while True:
         try:
             _last_status = _run_monitor_cycle()
@@ -376,6 +452,16 @@ def _background_monitor():
                 print(f"[monitor-agent] Event: {first_line}")
             except Exception as e:
                 print(f"[monitor-agent] Event error: {e}")
+
+        zabbix_counter += MONITOR_INTERVAL
+        if zabbix_counter >= ZABBIX_MONITOR_INTERVAL:
+            zabbix_counter = 0
+            try:
+                _last_zabbix_status = _check_zabbix_alerts()
+                first_line = _last_zabbix_status.split("\n")[0] if _last_zabbix_status else ""
+                print(f"[monitor-agent] Zabbix: {first_line}")
+            except Exception as e:
+                print(f"[monitor-agent] Zabbix error: {e}")
 
         time.sleep(MONITOR_INTERVAL)
 

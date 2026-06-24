@@ -11,7 +11,7 @@ rules:
   message: Orchestrator ask tool
   name: allow-orchestrator
 - action: allow
-  condition: tool_name in ["check_vms", "check_resources", "check_events", "status"]
+  condition: tool_name in ["check_vms", "check_resources", "check_events", "check_zabbix", "status"]
   message: Monitor agent tools
   name: allow-monitor
 - action: allow
