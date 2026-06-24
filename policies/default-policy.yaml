@@ -15,7 +15,7 @@ rules:
   message: Monitor agent tools
   name: allow-monitor
 - action: allow
-  condition: tool_name in ["pgsql_query", "pgsql_insert_alert", "pgsql_get_alerts", "pgsql_list_tables", "pgsql_describe_table", "pgsql_admin_exec"]
+  condition: tool_name in ["pgsql_query", "pgsql_execute", "pgsql_insert_alert", "pgsql_get_alerts", "pgsql_list_tables", "pgsql_describe_table", "pgsql_admin_exec"]
   message: PostgreSQL database tools
   name: allow-pgsql
 - action: deny
