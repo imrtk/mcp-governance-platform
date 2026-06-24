@@ -140,6 +140,20 @@ TOOLS = [
         },
     },
     {
+        "name": "pgsql_insert_metric",
+        "description": "Insert a performance metric. Fields: source, metric, value, labels.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source": {"type": "string", "description": "Source agent name"},
+                "metric": {"type": "string", "description": "Metric name (e.g. cluster.ram.usage.percent)"},
+                "value": {"type": "number", "description": "Metric value"},
+                "labels": {"type": "object", "description": "Optional labels (e.g. cluster/host name)", "default": {}},
+            },
+            "required": ["source", "metric", "value"],
+        },
+    },
+    {
         "name": "pgsql_get_alerts",
         "description": "Query recent alerts. Returns last N alerts with optional level/host filter.",
         "inputSchema": {
@@ -219,6 +233,25 @@ def _insert_alert(args: dict) -> str:
                 args.get("message", ""),
                 args.get("action", ""),
                 args.get("result", ""),
+            ),
+        )
+        cur.close()
+        return json.dumps({"status": "ok"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def _insert_metric(args: dict) -> str:
+    try:
+        conn = _get_conn(admin=True)
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO metrics (source, metric, value, labels) VALUES (%s, %s, %s, %s)""",
+            (
+                args.get("source", ""),
+                args.get("metric", ""),
+                float(args.get("value", 0)),
+                json.dumps(args.get("labels", {})),
             ),
         )
         cur.close()
@@ -308,6 +341,7 @@ TOOL_FUNCS = {
     "pgsql_query": _query,
     "pgsql_execute": _execute,
     "pgsql_insert_alert": _insert_alert,
+    "pgsql_insert_metric": _insert_metric,
     "pgsql_get_alerts": _get_alerts,
     "pgsql_list_tables": _list_tables,
     "pgsql_describe_table": _describe_table,

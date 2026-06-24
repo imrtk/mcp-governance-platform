@@ -34,6 +34,20 @@ TOOLS = [
         },
     },
     {
+        "name": "pgsql_insert_metric",
+        "description": "Insert a performance metric. Fields: source, metric, value, labels.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source": {"type": "string", "description": "Source agent name"},
+                "metric": {"type": "string", "description": "Metric name"},
+                "value": {"type": "number", "description": "Metric value"},
+                "labels": {"type": "object", "description": "Optional labels", "default": {}},
+            },
+            "required": ["source", "metric", "value"],
+        },
+    },
+    {
         "name": "pgsql_get_alerts",
         "description": "Query recent alerts with optional filters.",
         "inputSchema": {
@@ -92,6 +106,15 @@ def _query(args: dict) -> str:
     return _call("pgsql_query", {"sql": args.get("sql", ""), "params": args.get("params", [])})
 
 
+def _insert_metric(args: dict) -> str:
+    return _call("pgsql_insert_metric", {
+        "source": args.get("source", ""),
+        "metric": args.get("metric", ""),
+        "value": args.get("value", 0),
+        "labels": args.get("labels", {}),
+    })
+
+
 def _insert_alert(args: dict) -> str:
     return _call("pgsql_insert_alert", {
         "source": args.get("source", ""),
@@ -128,6 +151,7 @@ def _admin_exec(args: dict) -> str:
 TOOL_FUNCS = {
     "pgsql_query": _query,
     "pgsql_insert_alert": _insert_alert,
+    "pgsql_insert_metric": _insert_metric,
     "pgsql_get_alerts": _get_alerts,
     "pgsql_list_tables": _list_tables,
     "pgsql_describe_table": _describe_table,

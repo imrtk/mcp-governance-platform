@@ -73,21 +73,12 @@ def _log_alert(source: str, level: str, host: str, service: str, message: str, a
 
 
 def _insert_metric(source: str, metric: str, value: float, labels: dict | None = None):
-    try:
-        httpx.post(
-            f"{GATEWAY_URL}/api/gateway/agent/pgsql-agent/ask",
-            json={
-                "agent_id": "monitor-agent",
-                "tool_name": "pgsql_admin_exec",
-                "params": {
-                    "sql": "INSERT INTO metrics (source, metric, value, labels) VALUES (%s, %s, %s, %s)",
-                    "params": [source, metric, str(round(value, 2)), json.dumps(labels or {})],
-                },
-            },
-            timeout=5,
-        )
-    except Exception:
-        pass
+    _call_pgsql_agent("pgsql_insert_metric", {
+        "source": source,
+        "metric": metric,
+        "value": round(value, 2),
+        "labels": labels or {},
+    })
 
 
 def _call_vcenter(tool: str, params: dict) -> str:
