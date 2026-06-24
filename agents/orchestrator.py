@@ -57,6 +57,7 @@ Available agents:
 - vcenter-agent: VM management (list, power, deploy, snapshots, resources, events, alarms, metrics)
 - monitor-agent: vCenter VM monitoring (check_vms, check_resources, check_events, status)
 - pgsql-agent: PostgreSQL database queries, alert logging, schema inspection (pgsql_query, pgsql_insert_alert, pgsql_get_alerts, pgsql_list_tables, pgsql_describe_table)
+- zabbix-agent: Zabbix monitoring management (hosts, alerts, metrics, events)
 
 vcenter-agent tools:
 - To list all VMs → use: vcenter-agent vcenter_list_vms
@@ -114,6 +115,18 @@ TOOL: pgsql-agent pgsql_insert_alert {{"source": "orchestrator", "level": "info"
 
 User: list database tables
 TOOL: pgsql-agent pgsql_list_tables {{}}
+
+User: list monitored hosts
+TOOL: zabbix-agent zabbix_list_hosts {{}}
+
+User: show active alerts
+TOOL: zabbix-agent zabbix_list_alerts {{"limit": "20"}}
+
+User: get CPU metrics for host zeus
+TOOL: zabbix-agent zabbix_get_metrics {{"host": "zeus", "item_key": "system.cpu.load"}}
+
+User: get monitoring dashboard
+TOOL: zabbix-agent zabbix_get_dashboard {{}}
 """
 
 

@@ -71,6 +71,24 @@ _server_registry: dict[str, dict] = {
         "platform": "local",
         "capabilities": [],
     },
+    "zabbix-mcp": {
+        "id": 7,
+        "name": "zabbix-mcp",
+        "description": "Zabbix monitoring MCP: hosts, alerts, metrics, events, actions",
+        "url": os.getenv("ZABBIX_MCP_URL", "http://localhost:8030"),
+        "status": "running",
+        "platform": "local",
+        "capabilities": [],
+    },
+    "zabbix-agent": {
+        "id": 8,
+        "name": "zabbix-agent",
+        "description": "Zabbix agent: host management, alert/event monitoring, metrics",
+        "url": os.getenv("ZABBIX_AGENT_URL", "http://localhost:8031"),
+        "status": "running",
+        "platform": "local",
+        "capabilities": [],
+    },
 }
 
 

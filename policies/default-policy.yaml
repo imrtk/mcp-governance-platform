@@ -18,6 +18,10 @@ rules:
   condition: tool_name in ["pgsql_query", "pgsql_insert_alert", "pgsql_insert_metric", "pgsql_get_alerts", "pgsql_list_tables", "pgsql_describe_table", "pgsql_admin_exec"]
   message: PostgreSQL database tools
   name: allow-pgsql
+- action: allow
+  condition: tool_name in ["zabbix_list_hosts", "zabbix_get_host", "zabbix_list_alerts", "zabbix_get_metrics", "zabbix_get_events", "zabbix_create_host", "zabbix_delete_host", "zabbix_acknowledge_event", "zabbix_list_templates", "zabbix_list_groups", "zabbix_get_dashboard"]
+  message: Zabbix monitoring tools
+  name: allow-zabbix
 - action: deny
   condition: params contains "init 0" or params contains "init 6" or params contains
     "sudo init" or params contains "rm -rf" or params contains "shutdown" or params

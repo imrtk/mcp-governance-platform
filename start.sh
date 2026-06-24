@@ -21,6 +21,7 @@ cleanup() {
     info "Servisler durduruluyor..."
     pkill -f "uvicorn.*vcenter_mcp" 2>/dev/null || true
     pkill -f "uvicorn.*pgsql_mcp" 2>/dev/null || true
+    pkill -f "uvicorn.*zabbix_mcp" 2>/dev/null || true
     pkill -f "agents\." 2>/dev/null || true
     pkill -f "main.py" 2>/dev/null || true
     sleep 1
@@ -56,6 +57,14 @@ sleep 1
 
 info "pgsql-agent baslatiliyor (8021)..."
 uv run python -m agents.pgsql_agent &
+sleep 1
+
+info "zabbix-mcp baslatiliyor (8030)..."
+uv run uvicorn mcp_servers.zabbix_mcp:app --host 0.0.0.0 --port 8030 &
+sleep 1
+
+info "zabbix-agent baslatiliyor (8031)..."
+uv run python -m agents.zabbix_agent &
 sleep 1
 
 echo ""
