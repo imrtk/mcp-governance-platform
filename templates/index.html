@@ -121,6 +121,7 @@
             <div class="tab" onclick="switchTab('audit')">Audit Log</div>
             <div class="tab" onclick="switchTab('orch')">Orchestrator</div>
             <div class="tab" onclick="switchTab('chat')">Agent Konuşmaları</div>
+            <div class="tab" onclick="switchTab('ai')">AI Analiz</div>
             <div class="tab" onclick="switchTab('logstream')">Log Akışı</div>
         </div>
 
@@ -272,6 +273,43 @@
                     <button class="btn-save" onclick="mcpTestLoadTools()">🔄 Tool'ları Yenile</button>
                 </div>
                 <pre id="mcp-test-result" style="margin-top:12px;display:none;max-height:500px;overflow-y:auto"></pre>
+            </div>
+        </div>
+
+        <div id="tab-ai" class="tab-content">
+            <div class="card full">
+                <div class="inline-flex" style="justify-content:space-between;margin-bottom:12px">
+                    <h2 style="border:none;margin:0;padding:0">AI Zabbix Alert Analizi</h2>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn-add" onclick="runAIAnalysis()" id="ai-analyze-btn">🔍 Alert'leri Analiz Et</button>
+                    </div>
+                </div>
+                <div id="ai-status" style="margin-bottom:12px;font-size:13px;color:var(--text-secondary)">Henüz analiz yapılmadı.</div>
+                <div id="ai-result" style="display:none">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+                        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:16px">
+                            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">Analiz</div>
+                            <div id="ai-analysis" style="font-size:14px;line-height:1.5"></div>
+                        </div>
+                        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:16px">
+                            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">Önerilen Aksiyon</div>
+                            <div id="ai-suggestion" style="font-size:14px;line-height:1.5"></div>
+                            <div id="ai-apply-area" style="margin-top:12px;display:none">
+                                <div style="background:var(--pre-bg);border-radius:6px;padding:10px;margin-bottom:8px;font-family:monospace;font-size:12px">
+                                    <div style="color:#60a5fa;font-weight:600" id="ai-tool-name"></div>
+                                    <div style="color:#94a3b8;margin-top:4px" id="ai-tool-params"></div>
+                                </div>
+                                <button class="btn-save" onclick="applySuggestion()">✅ Öneriyi Uygula</button>
+                                <button class="btn-cancel" onclick="dismissSuggestion()">İptal</button>
+                            </div>
+                        </div>
+                    </div>
+                    <details style="margin-top:8px">
+                        <summary style="cursor:pointer;font-size:13px;color:var(--text-secondary)">Ham LLM Yanıtı</summary>
+                        <pre id="ai-raw" style="margin-top:6px;font-size:11px;max-height:300px;overflow-y:auto"></pre>
+                    </details>
+                </div>
+                <div id="ai-error" style="display:none;color:#ef4444;padding:12px;background:#fee2e2;border-radius:8px;margin-top:8px"></div>
             </div>
         </div>
 
@@ -807,6 +845,8 @@
         }
 
         let activeTab = 'rules';
+        let _aiSuggestion = null;
+
         function switchTab(name) {
             activeTab = name;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -820,6 +860,107 @@
             if (name === 'mcp-test') mcpTestLoadTools();
             if (name === 'orch') loadOrchHistory();
             if (name === 'chat') loadChat();
+        }
+
+        async function runAIAnalysis() {
+            const btn = document.getElementById('ai-analyze-btn');
+            const status = document.getElementById('ai-status');
+            const resultDiv = document.getElementById('ai-result');
+            const errorDiv = document.getElementById('ai-error');
+            btn.disabled = true;
+            btn.textContent = '⏳ Analiz ediliyor...';
+            status.textContent = 'Zabbix alertleri aliniyor, LLM analiz ediyor...';
+            resultDiv.style.display = 'none';
+            errorDiv.style.display = 'none';
+            _aiSuggestion = null;
+
+            try {
+                const r = await fetch('/api/gateway/agent/monitor-agent/ask', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({tool_name: 'analyze_alerts', params: {}})
+                });
+                const data = await r.json();
+                const text = data?.result?.content?.[0]?.text || JSON.stringify(data);
+
+                let parsed;
+                try { parsed = JSON.parse(text); } catch (e) { parsed = {analysis: text, severity: 'unknown'}; }
+
+                if (parsed.error) {
+                    errorDiv.textContent = 'LLM Hatasi: ' + parsed.error;
+                    errorDiv.style.display = 'block';
+                    status.textContent = 'Analiz basarisiz.';
+                    return;
+                }
+
+                document.getElementById('ai-analysis').textContent = parsed.analysis || 'Analiz mevcut degil';
+                const sevColors = {low: '#10b981', medium: '#f59e0b', high: '#f97316', critical: '#ef4444'};
+                const sevColor = sevColors[parsed.severity] || '#64748b';
+
+                if (parsed.suggested_tool && parsed.suggested_tool !== 'null') {
+                    document.getElementById('ai-suggestion').innerHTML = `
+                        <div style="margin-bottom:8px"><span class="badge" style="background:${sevColor};color:#fff">${parsed.severity || 'unknown'}</span></div>
+                        <div>${parsed.explanation || 'Oneri mevcut degil'}</div>`;
+                    document.getElementById('ai-tool-name').textContent = '🛠 ' + parsed.suggested_tool;
+                    document.getElementById('ai-tool-params').textContent = JSON.stringify(parsed.suggested_params || {}, null, 2);
+                    document.getElementById('ai-apply-area').style.display = 'block';
+                    _aiSuggestion = parsed;
+                } else {
+                    document.getElementById('ai-suggestion').innerHTML = `
+                        <div style="margin-bottom:8px"><span class="badge" style="background:${sevColor};color:#fff">${parsed.severity || 'unknown'}</span></div>
+                        <div style="color:var(--text-secondary)">${parsed.explanation || 'Oneri gerektirecek durum yok'}</div>`;
+                    document.getElementById('ai-apply-area').style.display = 'none';
+                }
+
+                document.getElementById('ai-raw').textContent = text;
+                resultDiv.style.display = 'block';
+                status.textContent = '✅ Analiz tamamlandi.';
+            } catch (e) {
+                errorDiv.textContent = 'Hata: ' + e.message;
+                errorDiv.style.display = 'block';
+                status.textContent = 'Analiz basarisiz.';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Alert\'leri Analiz Et';
+            }
+        }
+
+        async function applySuggestion() {
+            if (!_aiSuggestion || !_aiSuggestion.suggested_tool) return;
+            const tool = _aiSuggestion.suggested_tool;
+            const params = _aiSuggestion.suggested_params || {};
+
+            const agentMap = {
+                'zabbix_acknowledge_event': 'zabbix-agent',
+                'zabbix_get_dashboard': 'zabbix-agent',
+                'zabbix_get_events': 'zabbix-agent',
+                'zabbix_list_alerts': 'zabbix-agent',
+                'vcenter_ensure_running': 'vcenter-agent',
+                'vcenter_list_vms': 'vcenter-agent',
+            };
+            const agent = agentMap[tool] || 'monitor-agent';
+
+            if (!confirm(`"${tool}" aracini ${agent} uzerinde calistir?\n\nParametreler: ${JSON.stringify(params, null, 2)}`)) return;
+
+            try {
+                const r = await fetch(`/api/gateway/agent/${agent}/ask`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({tool_name: tool, params: params})
+                });
+                const data = await r.json();
+                const text = data?.result?.content?.[0]?.text || JSON.stringify(data, null, 2);
+                alert('Sonuc:\n\n' + text);
+                document.getElementById('ai-status').textContent = '✅ Oneri uygulandi. Sonuc: ' + text.slice(0, 100);
+            } catch (e) {
+                alert('Hata: ' + e.message);
+            }
+        }
+
+        function dismissSuggestion() {
+            _aiSuggestion = null;
+            document.getElementById('ai-apply-area').style.display = 'none';
+            document.getElementById('ai-status').textContent = 'Oneri reddedildi.';
         }
 
         function toggleTheme() {

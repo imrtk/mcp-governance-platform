@@ -255,6 +255,50 @@ def _check_zabbix_alerts() -> str:
     return "[ZABBIX] No active problems"
 
 
+def _ask_llm(prompt: str) -> str:
+    try:
+        headers = {"Content-Type": "application/json"}
+        if LLM_API_KEY:
+            headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+        payload = {
+            "model": LLM_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "temperature": 0.1,
+        }
+        resp = httpx.post(LLM_API_URL, json=payload, headers=headers, timeout=120)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f'{{"error": "LLM call failed: {e}"}}'
+
+
+def _analyze_alerts(args: dict) -> str:
+    alerts_raw = _call_zabbix("zabbix_list_alerts", {"limit": 50})
+    events_raw = _call_zabbix("zabbix_get_events", {"limit": 20, "severity": "average"})
+    dashboard_raw = _call_zabbix("zabbix_get_dashboard", {})
+
+    prompt = f"""You are a Zabbix monitoring assistant. Analyze alerts and suggest actions.
+
+Available tools: zabbix_acknowledge_event (params: eventid, message), 
+zabbix_get_dashboard, zabbix_get_events, vcenter_ensure_running (params: name),
+vcenter_list_vms.
+
+Alerts:
+{alerts_raw}
+
+Events:
+{events_raw}
+
+Dashboard:
+{dashboard_raw}
+
+Respond ONLY with JSON:
+{{"analysis":"turkce analiz","severity":"low|medium|high|critical","suggested_tool":"tool_name or null","suggested_params":{{}},"explanation":"turkce aciklama"}}"""
+
+    return _ask_llm(prompt)
+
+
 def _call_orchestrator(task: str) -> str:
     try:
         resp = httpx.post(
@@ -362,6 +406,11 @@ TOOLS = [
         "description": "Get latest monitoring status and alert history",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "analyze_alerts",
+        "description": "Analyze Zabbix alerts with LLM, get suggested actions and tool recommendations",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -415,6 +464,7 @@ TOOL_FUNCS = {
     "check_events": _check_events,
     "check_zabbix": _check_zabbix,
     "status": _status,
+    "analyze_alerts": _analyze_alerts,
 }
 
 
