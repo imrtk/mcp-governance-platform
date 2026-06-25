@@ -21,6 +21,8 @@ _last_status = ""
 _last_resource_status = ""
 _last_event_status = ""
 _last_zabbix_status = ""
+_last_zabbix_analysis = ""
+_last_zabbix_alert_count = 0
 
 PGSQL_AGENT_URL = os.getenv("PGSQL_AGENT_URL", "http://localhost:8021")
 
@@ -368,6 +370,12 @@ def _run_monitor_cycle() -> str:
     return "\n".join(lines)
 
 
+def _get_analysis(args: dict) -> str:
+    if _last_zabbix_analysis:
+        return _last_zabbix_analysis
+    return '{"analysis":"Henuz analiz yapilmadi","severity":"none","suggested_tool":null,"suggested_params":{},"explanation":""}'
+
+
 TOOLS = [
     {
         "name": "check_vms",
@@ -397,6 +405,11 @@ TOOLS = [
     {
         "name": "analyze_alerts",
         "description": "Analyze Zabbix alerts with LLM, get suggested actions and tool recommendations",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_analysis",
+        "description": "Get the latest AI analysis result for Zabbix alerts",
         "inputSchema": {"type": "object", "properties": {}},
     },
 ]
@@ -437,6 +450,12 @@ def _status(args: dict) -> str:
         parts.append(f"\n=== Event/Alarm Monitoring ===\n{_last_event_status}")
     if _last_zabbix_status:
         parts.append(f"\n=== Zabbix Monitoring ===\n{_last_zabbix_status}")
+    if _last_zabbix_analysis:
+        try:
+            parsed = json.loads(_last_zabbix_analysis)
+            parts.append(f"\n=== AI Analiz ===\n{parsed.get('analysis', '')}")
+        except Exception:
+            parts.append(f"\n=== AI Analiz ===\n{_last_zabbix_analysis[:200]}")
     with _alert_lock:
         if _alert_history:
             parts.append(f"\n=== Alert History ({len(_alert_history)} total) ===")
@@ -453,11 +472,12 @@ TOOL_FUNCS = {
     "check_zabbix": _check_zabbix,
     "status": _status,
     "analyze_alerts": _analyze_alerts,
+    "get_analysis": _get_analysis,
 }
 
 
 def _background_monitor():
-    global _last_status, _last_resource_status, _last_event_status, _last_zabbix_status
+    global _last_status, _last_resource_status, _last_event_status, _last_zabbix_status, _last_zabbix_analysis, _last_zabbix_alert_count
     resource_counter = 0
     event_counter = 0
     zabbix_counter = 0
@@ -496,8 +516,15 @@ def _background_monitor():
             zabbix_counter = 0
             try:
                 _last_zabbix_status = _check_zabbix_alerts()
+                alert_count = _last_zabbix_status.count("[") 
                 first_line = _last_zabbix_status.split("\n")[0] if _last_zabbix_status else ""
                 print(f"[monitor-agent] Zabbix: {first_line}")
+                if alert_count != _last_zabbix_alert_count:
+                    _last_zabbix_alert_count = alert_count
+                    if alert_count > 1:
+                        print("[monitor-agent] Yeni alert tespit edildi, AI analiz basliyor...")
+                        _last_zabbix_analysis = _analyze_alerts({})
+                        print(f"[monitor-agent] AI analiz: {_last_zabbix_analysis[:100]}")
             except Exception as e:
                 print(f"[monitor-agent] Zabbix error: {e}")
 

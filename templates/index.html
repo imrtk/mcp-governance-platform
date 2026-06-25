@@ -860,17 +860,58 @@
             if (name === 'mcp-test') mcpTestLoadTools();
             if (name === 'orch') loadOrchHistory();
             if (name === 'chat') loadChat();
+            if (name === 'ai') loadAIAnalysis();
+        }
+
+        async function loadAIAnalysis() {
+            try {
+                const r = await fetch('/api/gateway/agent/monitor-agent/ask', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({tool_name: 'get_analysis', params: {}})
+                });
+                const data = await r.json();
+                const text = data?.result?.content?.[0]?.text || '{}';
+                let parsed;
+                try { parsed = JSON.parse(text); } catch (e) { parsed = {}; }
+                if (!parsed.analysis || parsed.analysis === 'Henuz analiz yapilmadi') return;
+                _renderAIAnalysis(parsed, text);
+            } catch (e) {}
+        }
+
+        function _renderAIAnalysis(parsed, rawText) {
+            const resultDiv = document.getElementById('ai-result');
+            const status = document.getElementById('ai-status');
+            document.getElementById('ai-analysis').textContent = parsed.analysis || 'Analiz mevcut degil';
+            const sevColors = {low: '#10b981', medium: '#f59e0b', high: '#f97316', critical: '#ef4444'};
+            const sevColor = sevColors[parsed.severity] || '#64748b';
+            if (parsed.suggested_tool && parsed.suggested_tool !== 'null') {
+                document.getElementById('ai-suggestion').innerHTML = `
+                    <div style="margin-bottom:8px"><span class="badge" style="background:${sevColor};color:#fff">${parsed.severity || 'unknown'}</span></div>
+                    <div>${parsed.explanation || 'Oneri mevcut degil'}</div>`;
+                document.getElementById('ai-tool-name').textContent = '🛠 ' + parsed.suggested_tool;
+                document.getElementById('ai-tool-params').textContent = JSON.stringify(parsed.suggested_params || {}, null, 2);
+                document.getElementById('ai-apply-area').style.display = 'block';
+                _aiSuggestion = parsed;
+            } else {
+                document.getElementById('ai-suggestion').innerHTML = `
+                    <div style="margin-bottom:8px"><span class="badge" style="background:${sevColor};color:#fff">${parsed.severity || 'unknown'}</span></div>
+                    <div style="color:var(--text-secondary)">${parsed.explanation || 'Oneri gerektirecek durum yok'}</div>`;
+                document.getElementById('ai-apply-area').style.display = 'none';
+            }
+            document.getElementById('ai-raw').textContent = rawText || '';
+            resultDiv.style.display = 'block';
+            status.textContent = '✅ Son analiz: ' + (parsed.severity || 'bilinmiyor');
         }
 
         async function runAIAnalysis() {
             const btn = document.getElementById('ai-analyze-btn');
             const status = document.getElementById('ai-status');
-            const resultDiv = document.getElementById('ai-result');
             const errorDiv = document.getElementById('ai-error');
             btn.disabled = true;
             btn.textContent = '⏳ Analiz ediliyor...';
             status.textContent = 'Zabbix alertleri aliniyor, LLM analiz ediyor...';
-            resultDiv.style.display = 'none';
+            document.getElementById('ai-result').style.display = 'none';
             errorDiv.style.display = 'none';
             _aiSuggestion = null;
 
@@ -897,28 +938,7 @@
                     status.textContent = 'Analiz basarisiz.';
                     return;
                 }
-
-                document.getElementById('ai-analysis').textContent = parsed.analysis || 'Analiz mevcut degil';
-                const sevColors = {low: '#10b981', medium: '#f59e0b', high: '#f97316', critical: '#ef4444'};
-                const sevColor = sevColors[parsed.severity] || '#64748b';
-
-                if (parsed.suggested_tool && parsed.suggested_tool !== 'null') {
-                    document.getElementById('ai-suggestion').innerHTML = `
-                        <div style="margin-bottom:8px"><span class="badge" style="background:${sevColor};color:#fff">${parsed.severity || 'unknown'}</span></div>
-                        <div>${parsed.explanation || 'Oneri mevcut degil'}</div>`;
-                    document.getElementById('ai-tool-name').textContent = '🛠 ' + parsed.suggested_tool;
-                    document.getElementById('ai-tool-params').textContent = JSON.stringify(parsed.suggested_params || {}, null, 2);
-                    document.getElementById('ai-apply-area').style.display = 'block';
-                    _aiSuggestion = parsed;
-                } else {
-                    document.getElementById('ai-suggestion').innerHTML = `
-                        <div style="margin-bottom:8px"><span class="badge" style="background:${sevColor};color:#fff">${parsed.severity || 'unknown'}</span></div>
-                        <div style="color:var(--text-secondary)">${parsed.explanation || 'Oneri gerektirecek durum yok'}</div>`;
-                    document.getElementById('ai-apply-area').style.display = 'none';
-                }
-
-                document.getElementById('ai-raw').textContent = text;
-                resultDiv.style.display = 'block';
+                _renderAIAnalysis(parsed, text);
                 status.textContent = '✅ Analiz tamamlandi.';
             } catch (e) {
                 errorDiv.textContent = 'Hata: ' + e.message;
@@ -1086,6 +1106,7 @@
             if (activeTab === 'audit') loadAudit();
             if (activeTab === 'orch') loadOrchHistory();
             if (activeTab === 'chat') loadChat();
+            if (activeTab === 'ai') loadAIAnalysis();
             loadLogStream();
         }, 1500);
     </script>
