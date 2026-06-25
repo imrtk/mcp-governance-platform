@@ -274,17 +274,15 @@ def _ask_llm(prompt: str) -> str:
 
 
 def _analyze_alerts(args: dict) -> str:
-    alerts_raw = _call_zabbix("zabbix_list_alerts", {"limit": 15})
-    events_raw = _call_zabbix("zabbix_get_events", {"limit": 5, "severity": "average"})
-    dashboard_raw = _call_zabbix("zabbix_get_dashboard", {})
+    alerts_raw = _call_zabbix("zabbix_list_alerts", {"limit": 1, "severity": "average"})
+    events_raw = _call_zabbix("zabbix_get_events", {"limit": 1, "severity": "average"})
 
-    prompt = f"""You are a Zabbix assistant. Analyze and suggest.
+    prompt = f"""You are a Zabbix assistant. Analyze the latest alert/event.
 
 Tools: zabbix_acknowledge_event(eventid,message), vcenter_ensure_running(name)
 
-Alerts: {alerts_raw}
-Events: {events_raw}
-Dashboard: {dashboard_raw}
+Alert: {alerts_raw[:600]}
+Event: {events_raw[:600]}
 
 JSON only:
 {{"analysis":"turkce","severity":"low|medium|high|critical","suggested_tool":"tool or null","suggested_params":{{}},"explanation":"turkce"}}"""
