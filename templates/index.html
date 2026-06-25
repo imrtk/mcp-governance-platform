@@ -874,12 +874,17 @@
             errorDiv.style.display = 'none';
             _aiSuggestion = null;
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000);
+
             try {
                 const r = await fetch('/api/gateway/agent/monitor-agent/ask', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({tool_name: 'analyze_alerts', params: {}})
+                    body: JSON.stringify({tool_name: 'analyze_alerts', params: {}}),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
                 const data = await r.json();
                 const text = data?.result?.content?.[0]?.text || JSON.stringify(data);
 

@@ -266,7 +266,7 @@ def _ask_llm(prompt: str) -> str:
             "stream": False,
             "temperature": 0.1,
         }
-        resp = httpx.post(LLM_API_URL, json=payload, headers=headers, timeout=120)
+        resp = httpx.post(LLM_API_URL, json=payload, headers=headers, timeout=300)
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"]
     except Exception as e:
@@ -274,27 +274,20 @@ def _ask_llm(prompt: str) -> str:
 
 
 def _analyze_alerts(args: dict) -> str:
-    alerts_raw = _call_zabbix("zabbix_list_alerts", {"limit": 50})
-    events_raw = _call_zabbix("zabbix_get_events", {"limit": 20, "severity": "average"})
+    alerts_raw = _call_zabbix("zabbix_list_alerts", {"limit": 15})
+    events_raw = _call_zabbix("zabbix_get_events", {"limit": 5, "severity": "average"})
     dashboard_raw = _call_zabbix("zabbix_get_dashboard", {})
 
-    prompt = f"""You are a Zabbix monitoring assistant. Analyze alerts and suggest actions.
+    prompt = f"""You are a Zabbix assistant. Analyze and suggest.
 
-Available tools: zabbix_acknowledge_event (params: eventid, message), 
-zabbix_get_dashboard, zabbix_get_events, vcenter_ensure_running (params: name),
-vcenter_list_vms.
+Tools: zabbix_acknowledge_event(eventid,message), vcenter_ensure_running(name)
 
-Alerts:
-{alerts_raw}
+Alerts: {alerts_raw}
+Events: {events_raw}
+Dashboard: {dashboard_raw}
 
-Events:
-{events_raw}
-
-Dashboard:
-{dashboard_raw}
-
-Respond ONLY with JSON:
-{{"analysis":"turkce analiz","severity":"low|medium|high|critical","suggested_tool":"tool_name or null","suggested_params":{{}},"explanation":"turkce aciklama"}}"""
+JSON only:
+{{"analysis":"turkce","severity":"low|medium|high|critical","suggested_tool":"tool or null","suggested_params":{{}},"explanation":"turkce"}}"""
 
     return _ask_llm(prompt)
 

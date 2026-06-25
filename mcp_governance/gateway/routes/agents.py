@@ -46,7 +46,7 @@ async def ask_agent(agent_name: str, req: ToolCallRequest):
     if not server_url:
         raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found in registry")
 
-    async with httpx.AsyncClient(timeout=180) as client:
+    async with httpx.AsyncClient(timeout=300) as client:
         mcp_payload = {
             "jsonrpc": "2.0",
             "method": "tools/call",
