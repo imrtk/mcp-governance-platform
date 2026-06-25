@@ -1106,9 +1106,11 @@
             if (activeTab === 'audit') loadAudit();
             if (activeTab === 'orch') loadOrchHistory();
             if (activeTab === 'chat') loadChat();
-            if (activeTab === 'ai') loadAIAnalysis();
             loadLogStream();
         }, 1500);
+        setInterval(() => {
+            if (activeTab === 'ai') loadAIAnalysis();
+        }, 30000);
     </script>
 </body>
 </html>
