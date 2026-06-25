@@ -18,9 +18,10 @@ def _zapi(method: str, params: dict = None) -> dict:
     if not ZABBIX_URL:
         return {"error": "ZABBIX_URL environment variable not set"}
     api_url = ZABBIX_URL.rstrip("/") + "/api_jsonrpc.php"
+    headers = {"Content-Type": "application/json"}
     payload = {"jsonrpc": "2.0", "method": method, "params": params or {}, "id": 1}
     if ZABBIX_API_TOKEN:
-        payload["auth"] = ZABBIX_API_TOKEN
+        headers["Authorization"] = f"Bearer {ZABBIX_API_TOKEN}"
     elif _auth_token:
         payload["auth"] = _auth_token
     else:
@@ -37,7 +38,7 @@ def _zapi(method: str, params: dict = None) -> dict:
         except Exception as e:
             return {"error": f"Zabbix login failed: {e}"}
     try:
-        r = httpx.post(api_url, json=payload, timeout=30)
+        r = httpx.post(api_url, json=payload, headers=headers, timeout=30)
         return r.json()
     except Exception as e:
         return {"error": str(e)}
