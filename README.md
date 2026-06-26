@@ -10,37 +10,36 @@ Tüm MCP araçları ve agent'lar tek bir governance katmanından geçer.
 │  Dashboard (8080)    Vibe CLI (stdio)    API (curl)      │
 └──────────────────────────┬───────────────────────────────┘
                            │
-                    ┌──────▼──────┐
-                    │   Gateway   │  REST API :8080
-                    │  main.py    │  Policy Engine
-                    │  registry   │  Audit Log
-                    └──────┬──────┘
+                     ┌──────▼──────┐
+                     │   Gateway   │  REST API :8080
+                     │  main.py    │  Policy Engine
+                     │  registry   │  Audit Log
+                     └──────┬──────┘
                            │
-          ┌────────────────┼──────────────────┐
-          │                │                  │
-   ┌──────▼──────┐  ┌─────▼──────┐   ┌──────▼──────┐
-   │ Orchestrator│  │   Monitor  │   │ gateway_mcp │
-   │ Agent :8013 │  │ Agent :8014│   │ (Vibe stdio)│
-   │  LLM plan   │  │  60sn loop │   └──────┬──────┘
-   │  + delegasyon│  │  tespit→   │          │
-   └──────┬──────┘  │  orchestrat│   ┌──────┴──────┐
-          │         └────────────┘   │ file-mcp:8001│
-    ┌─────┼─────┐                    │ shell-mcp:8002│
-    │     │     │                    │ debian-mcp:8003│
-  ┌─▼─┐ ┌─▼─┐ ┌─▼──┐               │ do-mcp:8005   │
-  │do │ │sys│ │dev │               └──────────────┘
-  │agt│ │adm│ │ops │
-  │15 │ │10 │ │11  │
-  └───┘ └───┘ └────┘
+           ┌────────────────┼──────────────────┬─────────────────┐
+           │                │                  │                 │
+    ┌──────▼──────┐  ┌─────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
+    │ Orchestrator│  │   Monitor  │   │ vcenter-mcp │   │   zabbix    │
+    │ Agent :8013 │  │ Agent :8014│   │    :8006    │   │  MCP :8030  │
+    │  LLM plan   │  │  60sn loop │   │ vcenter-agt │   │  zabbix-agt │
+    │  + delegasyon│  │  tespit→   │   │    :8016    │   │  :8031      │
+    └──────┬──────┘  │  orchestrat│   └──────┬──────┘   └──────┬──────┘
+           │         └────────────┘          │                 │
+     ┌─────┼─────┐                    ┌──────┴──────┐   ┌──────┴──────┐
+     │           │                    │  pgsql-mcp  │   │  Postgres   │
+     │   vcenter │                    │    :8020    │   │   DB        │
+     │   agent   │                    │  pgsql-agt  │   │  192.168..  │
+     │   :8016   │                    │    :8021    │   └─────────────┘
+     └───────────┘                    └─────────────┘
 ```
 
 ## İşleyiş
 
-1. **Monitor Agent** (8014) her 60sn'de host ve droplet'ları kontrol eder
+1. **Monitor Agent** (8014) her 60sn'de vCenter VM'leri + Zabbix alert'lerini kontrol eder
 2. Sorun tespit ederse **Orchestrator Agent**'a (8013) task gönderir
-3. **Orchestrator** LLM (Ollama) ile plan yapar → hangi agent hangi tool'u çağıracak
+3. **Orchestrator** LLM ile plan yapar → hangi agent hangi tool'u çağıracak
 4. **Gateway** üzerinden ilgili agent'a iletilir
-5. Agent kendi MCP'sini çağırır (do-agent → do-mcp, sysadmin-agent → debian-mcp)
+5. Agent kendi MCP'sini çağırır (vcenter-agent → vcenter-mcp, pgsql-agent → pgsql-mcp)
 6. Tüm adımlar audit log, orchestrator history ve dashboard'da görünür
 
 > **Hiçbir agent kendi başına hareket etmez.** Sadece orchestrator çağırdığında çalışır.
@@ -49,16 +48,17 @@ Tüm MCP araçları ve agent'lar tek bir governance katmanından geçer.
 ## Ortam Değişkenleri
 
 ```bash
-# Zorunlu
-DO_API_TOKEN="dop_v1_..."       # DigitalOcean API token (project scope)
-DO_PROJECT_ID="..."              # HBDMS proje ID'si
+# LLM API (OpenAI-compatible)
+LLM_API_URL="http://localhost:11434/v1/chat/completions"
+LLM_API_KEY=""
+LLM_MODEL="qwen3-coder:480b-cloud"
 
-# Opsiyonel
-GATEWAY_URL="http://localhost:8080"
-OLLAMA_URL="http://localhost:11434"
-OLLAMA_MODEL="qwen3-coder:480b-cloud"
+# Monitor
 MONITOR_INTERVAL="60"
 MONITOR_AUTO_FIX="true"
+
+# Gateway
+GATEWAY_URL="http://localhost:8080"
 ```
 
 ## Gereksinimler
@@ -66,10 +66,7 @@ MONITOR_AUTO_FIX="true"
 | Bağımlılık | Versiyon | Açıklama |
 |---|---|---|
 | Python | >= 3.11 | Runtime |
-| Ollama | latest | LLM için (orchestrator planlama) |
 | uv | latest | Python paket yöneticisi |
-| Docker | latest | debian-mcp container'ı için |
-| SSH keys | - | Remote host erişimi için |
 
 ## Hızlı Başlangıç
 
@@ -80,19 +77,16 @@ cd mcp-governance-platform
 
 # 2. .env dosyasını oluştur
 cp .env.example .env
-# .env dosyasını düzenle: DO_API_TOKEN, DO_PROJECT_ID, host IP'leri
+# .env dosyasını düzenle: gerekli değişkenleri gir
 
 # 3. Bağımlılıkları yükle
 uv sync
 
-# 4. debian-mcp Docker container'ını başlat
-docker compose up -d
-
-# 5. Tüm servisleri başlat
+# 4. Tüm servisleri başlat
 chmod +x start.sh
 ./start.sh
 
-# 6. Dashboard
+# 5. Dashboard
 open http://localhost:8080/dashboard
 ```
 
@@ -101,30 +95,24 @@ open http://localhost:8080/dashboard
 | Servis | Port | Tür | Açıklama |
 |---|---|---|---|
 | **main (gateway)** | 8080 | REST API | Governance, registry, dashboard, audit |
-| **file-mcp** | 8001 | HTTP MCP | Dosya işlemleri |
-| **shell-mcp** | 8002 | HTTP MCP | Shell komutları (allowlist) |
-| **debian-mcp** | 8003 | HTTP MCP | Remote Debian SSH yönetimi (Docker) |
-| **do-mcp** | 8005 | HTTP MCP | DigitalOcean droplet yönetimi |
 | **vcenter-mcp** | 8006 | HTTP MCP | vCenter VM yönetimi |
+| **pgsql-mcp** | 8020 | HTTP MCP | PostgreSQL veritabanı işlemleri |
+| **zabbix-mcp** | 8030 | HTTP MCP | Zabbix monitoring entegrasyonu |
 | **orchestrator-agent** | 8013 | HTTP MCP | LLM planlama + delegasyon |
-| **monitor-agent** | 8014 | HTTP MCP | Host/servis/droplet izleme |
-| **sysadmin-agent** | 8010 | HTTP MCP | Sistem yönetimi |
-| **devops-agent** | 8011 | HTTP MCP | DevOps operasyonları |
-| **secops-agent** | 8012 | HTTP MCP | Güvenlik kontrolleri |
-| **do-agent** | 8015 | HTTP MCP | DO droplet yönetimi |
-| **Ollama** | 11434 | HTTP | LLM servisi |
+| **monitor-agent** | 8014 | HTTP MCP | vCenter/Zabbix izleme |
+| **vcenter-agent** | 8016 | HTTP MCP | vCenter VM yönetimi |
+| **pgsql-agent** | 8021 | HTTP MCP | PostgreSQL sorgu + alert logging |
+| **zabbix-agent** | 8031 | HTTP MCP | Zabbix host/alert/metric yönetimi |
 
 ## Agent'lar ve İletişim
 
 | Agent | Port | LLM? | Görev | Kim Çağırır |
 |---|---|---|---|---|
 | **orchestrator** | 8013 | Evet (plan+özet) | Task planlama, delegasyon | Monitor, kullanıcı (dashboard/Vibe/API) |
-| **monitor** | 8014 | Hayır | Host/servis/droplet izleme | Bağımsız loop (60sn) — tespit edince orchestrator'a bildirir |
-| **do-agent** | 8015 | Hayır | DO droplet power on/off/status | Orchestrator |
+| **monitor** | 8014 | Hayır | vCenter VM/kaynak/event + Zabbix alert izleme | Bağımsız loop (60sn) — tespit edince orchestrator'a bildirir |
 | **vcenter-agent** | 8016 | Hayır | vCenter VM yönetimi (power, deploy, snapshot) | Orchestrator |
-| **sysadmin** | 8010 | Hayır | Host komutları, servis yönetimi | Orchestrator |
-| **devops** | 8011 | Hayır | Paket yönetimi, deploy | Orchestrator |
-| **secops** | 8012 | Hayır | Güvenlik taraması, UFW | Orchestrator |
+| **pgsql-agent** | 8021 | Hayır | PostgreSQL sorgu, alert logging, metric | Orchestrator |
+| **zabbix-agent** | 8031 | Hayır | Zabbix host/alert/metric/event yönetimi | Orchestrator |
 
 Tüm iletişim **gateway** üzerinden geçer → policy enforcement, audit log, agent message log.
 
@@ -150,7 +138,7 @@ Dashboard 1.5sn'de bir otomatik güncellenir.
 # Orchestrator'a task gönder
 curl -X POST http://localhost:8080/api/gateway/agent/orchestrator-agent/ask \
   -H 'Content-Type: application/json' \
-  -d '{"tool_name":"ask","params":{"task":"zeus dropleti kontrol et"}}'
+  -d '{"tool_name":"ask","params":{"task":"hera host durumunu kontrol et"}}'
 
 # Monitor durumu
 curl http://localhost:8080/api/gateway/monitor/status
@@ -172,9 +160,7 @@ curl http://localhost:8080/api/registry/servers
 
 `policies/default-policy.yaml` ile tanımlanır. Dashboard üzerinden düzenlenebilir.
 
-İki katmanlı güvenlik:
-1. **Python katmanı** — `ssh_exec`/`run_shell`'de destructive komut taraması
-2. **YAML policy katmanı** — parametre bazlı engelleme
+**YAML policy katmanı** ile parametre bazlı engelleme yapılır.
 
 ## Proje Yapısı
 
@@ -183,35 +169,27 @@ curl http://localhost:8080/api/registry/servers
 │   ├── base_agent.py          # BaseAgent sınıfı
 │   ├── orchestrator.py        # LLM planlama + delegasyon
 │   ├── monitor_agent.py       # Periyodik izleme
-│   ├── do_agent.py            # DO droplet yönetimi
 │   ├── vcenter_agent.py       # vCenter VM yönetimi
-│   ├── sysadmin_agent.py      # Sistem yönetimi
-│   ├── devops_agent.py        # DevOps operasyonları
-│   └── secops_agent.py        # Güvenlik kontrolleri
+│   ├── pgsql_agent.py         # PostgreSQL agent
+│   └── zabbix_agent.py        # Zabbix monitoring agent
 ├── agt_gateway/
 │   └── gateway.py             # REST API gateway + policy engine
 ├── mcp_servers/               # MCP sunucuları (backend)
-│   ├── file_mcp.py
-│   ├── shell_mcp.py
-│   ├── shell_mcp_http.py
-│   ├── debian_mcp.py
-│   ├── do_mcp.py
 │   ├── vcenter_mcp.py
-│   ├── gateway_mcp.py         # Vibe MCP proxy
-│   └── Dockerfile.debian-mcp
+│   ├── pgsql_mcp.py
+│   ├── zabbix_mcp.py
+│   └── gateway_mcp.py         # Vibe MCP proxy
 ├── registry/
 │   └── api.py                 # Servis kaydı
 ├── templates/
 │   └── index.html             # Dashboard
 ├── config/
-│   ├── hosts.yaml             # SSH host tanımları
 │   └── settings.py
 ├── policies/
 │   └── default-policy.yaml
 ├── main.py                    # FastAPI uygulaması
 ├── setup.sh                   # Kurulum script'i
 ├── start.sh                   # Servis başlatma script'i
-├── docker-compose.yml         # debian-mcp container
 ├── .env.example               # Örnek env dosyası
 ├── pyproject.toml
 └── uv.lock

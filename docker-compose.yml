@@ -1,16 +1,1 @@
-version: '3.8'
-
-services:
-  debian-mcp:
-    build:
-      context: .
-      dockerfile: mcp_servers/Dockerfile.debian-mcp
-    container_name: debian-mcp
-    ports:
-      - "8003:8003"
-    volumes:
-      - ./config/hosts.yaml:/app/config/hosts.yaml:ro
-      - ~/.ssh:/root/.ssh:ro
-    environment:
-      - MCP_PORT=8003
-    restart: unless-stopped
+# docker-compose not needed — all services run via start.sh

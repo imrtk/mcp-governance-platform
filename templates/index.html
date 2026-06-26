@@ -109,8 +109,6 @@
 
         <div class="host-status-bar" id="host-status-bar" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
 
-        <div class="host-status-bar" id="droplet-status-bar" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
-
         <div class="tab-bar">
             <div class="tab active" onclick="switchTab('rules')">Policy Rules</div>
             <div class="tab" onclick="switchTab('yaml')">YAML Editor</div>
@@ -490,7 +488,7 @@
             const agents = servers.filter(s => s.name.endsWith('-agent'));
             const grid = document.getElementById('agents-grid');
             grid.innerHTML = agents.map(a => {
-                const icon = a.name.includes('sysadmin') ? '🖥️' : a.name.includes('devops') ? '🚀' : '🔒';
+                const icon = a.name.includes('vcenter') ? '🖥️' : a.name.includes('orchestrator') ? '🧠' : '🔒';
                 return `<div class="card">
                     <div style="font-size:32px;text-align:center;margin-bottom:8px">${icon}</div>
                     <h2 style="text-align:center;border:none">${a.name}</h2>
@@ -753,34 +751,6 @@
             const d = document.createElement('div');
             d.textContent = s;
             return d.innerHTML;
-        }
-
-        async function loadDropletStatus() {
-            try {
-                const data = await api('/api/gateway/monitor/status');
-                const bar = document.getElementById('droplet-status-bar');
-                if (!data.ok || !data.droplets || !data.droplets.length) {
-                    bar.innerHTML = '';
-                    return;
-                }
-                bar.innerHTML = data.droplets.map(d => {
-                    const isOff = d.status === 'off';
-                    const bg = isOff ? '#fee2e2' : '#d1fae5';
-                    const color = isOff ? '#991b1b' : '#065f46';
-                    const label = isOff ? 'KAPALI' : d.status;
-                    const fix = d.fixed ? '<div style="font-size:11px;color:#92400e;margin-top:4px">🔧 Auto-fix uygulandi</div>' : '';
-                    return `<div style="background:var(--bg-card);border-radius:10px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.1);flex:1;min-width:160px;border-left:4px solid ${isOff ? '#ef4444' : '#10b981'}">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                            <strong style="font-size:16px">${escHtml(d.name)}</strong>
-                            <span class="badge" style="background:${bg};color:${color}">${label}</span>
-                        </div>
-                        ${fix}
-                        <div style="font-size:11px;color:#64748b;margin-top:4px">${isOff ? '⚠ Otomatik acilacak' : '☁ DO Droplet'}</div>
-                    </div>`;
-                }).join('');
-            } catch (e) {
-                document.getElementById('droplet-status-bar').innerHTML = '';
-            }
         }
 
         async function loadHostStatus() {
@@ -1096,10 +1066,8 @@
 
         loadRules();
         loadHostStatus();
-        loadDropletStatus();
         setInterval(() => {
             loadHostStatus();
-            loadDropletStatus();
             if (activeTab === 'rules') loadRules();
             if (activeTab === 'servers') loadServers();
             if (activeTab === 'agents') loadAgents();
